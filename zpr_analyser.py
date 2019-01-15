@@ -169,7 +169,7 @@ class EPCfile(CDFfile):
 
     @property
     def nmodes(self):
-        if self.zpr_ren_modes is not None:
+        if self.zp_ren_modes is not None:
             return self.zp_ren_modes.shape[0] 
         elif self.fan_g2 is not None:
             return self.fan_g2.shape[4]
@@ -370,8 +370,12 @@ class EigenvalueCorrections(object):
             else:
                 self.td_ren = self.epc.td_ren
         else:
+            if self.modes:
+                self.td_ren = self.epc.zp_ren_modes
+                self.td_ren = np.einsum('vskn->skn',self.td_ren)
             self.td_ren = self.epc.zp_ren
             self.td_ren = np.expand_dims(self.td_ren, axis=3) 
+            print(self.td_ren)
 
             # Change ntemp to 1
             self.ntemp = 1
@@ -390,7 +394,7 @@ class EigenvalueCorrections(object):
         # Compute eingenvalue corrections for each temperature
         self.eigcorr = self.get_corrections(self.nkpt, self.eig0, self.td_ren)
 
-        # Get contribution from each qpt
+        # Get contribution from each qpt and/or mode
         if self.contribution :
             if self.modes:
                 self.contr_qpt_modes = self.epc.contr_qpt_modes
@@ -401,13 +405,17 @@ class EigenvalueCorrections(object):
 
             else:
                 self.contr_qpt = self.epc.contr_qpt
+        else:
+            if self.modes:
+                self.zp_ren_modes = self.epc.zp_ren_modes
+                self.zp_ren_modes = np.einsum('ijkl->jkli',self.zp_ren_modes) #(nsppol,nkpt,nband,nmodes)
+                self.nmodes = self.epc.nmodes
 
         if self.full_contribution or self.split_contribution: 
             self.fan_g2 = self.epc.fan_g2
             self.ddw_g2 = self.epc.ddw_g2
             self.deltaE_ddw = self.epc.deltaE_ddw
             self.fan_occterm = self.epc.fan_occterm
-            self.nmodes = self.epc.nmodes
             self.qpt_weight = self.epc.qpt_weight
             self.ddw_tdep = self.epc.ddw_tdep
 
@@ -435,9 +443,12 @@ class EigenvalueCorrections(object):
                     self.reduced_contr_qpt = np.zeros((self.nsppol,self.reduced_nkpt,self.max_band,self.nqpt,self.ntemp))
                     for t in range(self.ntemp):
                         self.reduced_contr_qpt[:,:,:,:,t] = self.average_kpts(self.reduced_kpts_index, self.contr_qpt[:,:,:,:,t], self.nqpt)
+            else:
+                self.reduced_zp_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nmodes))
+                self.reduced_zp_ren_modes = self.average_kpts(self.reduced_kpts_index, self.zp_ren_modes, self.nmodes)
+
 
             if self.full_contribution or self.split_contribution:
-                print(self.nmodes) 
                 if not self.nband_contr:
                     raise Exception('Must provide nband_contr')
 
@@ -705,14 +716,28 @@ class EigenvalueCorrections(object):
                     if self.split:
                         self.gap_loc2, self.gap_energy2, self.gap_renorm2 = self.get_gap_info(self.reduced_eig0, self.reduced_eigcorr,True)
                     kpts = self.reduced_kpath
+
+                    if self.modes:
+                        self.gap_renorm_modes = self.get_mode_info(self.gap_loc,False)
+
+                        if self.split:
+                            self.gap_renorm_modes_split = self.get_mode_info(self.gap_loc2,True)
+
                     if self.indirect:
                         self.indirect_gap_loc, self.indirect_gap_energy, self.indirect_gap_renorm, self.indirect_gap_energy_band, self.indirect_gap_renorm_band = self.get_indirect_gap_info(self.reduced_eig0, self.reduced_eigcorr, False)
+
+                        if self.modes:
+                            self.indirect_gap_renorm_modes = self.get_indirect_mode_info(self.indirect_gap_loc, False)
 
                         if self.split:
                             self.indirect_gap_loc2, self.indirect_gap_energy2, self.indirect_gap_renorm2, self.indirect_gap_energy_band2, self.indirect_gap_renorm_band2 = self.get_indirect_gap_info(self.reduced_eig0, self.reduced_eigcorr, True)
 
+                            if self.modes:
+                                self.indirect_gap_renorm_modes_split = self.get_indirect_mode_info(self.indirect_gap_loc2, True)
                 
                 else:
+                    # The non-reduced option does not have as many possibilities as the reduced one... anyway if I have only gamma, it will reduce to itself! So, i could simply
+                    # remove this option ???
                     self.gap_loc, self.gap_energy, self.gap_renorm = self.get_gap_info(self.eig0, self.eigcorr,False)
                     kpts = self.kpoints
 
@@ -801,9 +826,6 @@ class EigenvalueCorrections(object):
         # Gets direct gap information
 
         # Finds the location of the unperturbed and perturbed direct gap + computes the gap energy
-        #mid = np.int(len(self.bands_to_print)/2)
-        #val = self.bands_to_print[mid-2]
-        #cond = self.bands_to_print[mid-1]
         val = self.valence - 1
         cond = val + 1
 
@@ -898,7 +920,7 @@ class EigenvalueCorrections(object):
         #cond = self.bands_to_print[1]-1
         val = self.valence - 1
         cond = val + 1
-       
+        print(val,cond) 
 
         if split == False:
 
@@ -924,7 +946,9 @@ class EigenvalueCorrections(object):
             for i in range(self.ntemp):
            
                 arrc = pert[0,:,cond,i]
+                print(arrc)
                 arrv = pert[0,:,val,i]
+                print(arrv)
                 loc[i+1,0] = np.argmax(arrv)
                 loc[i+1,1] = np.argmin(arrc)
                 ener_band[i+1,0] = arrv[loc[i+1,0]]*cst.ha_to_ev 
@@ -1011,7 +1035,88 @@ class EigenvalueCorrections(object):
             elif self.units == 'eV':
                 return loc, ener, ren, ener_band, ren_band
 
-               
+    def get_mode_info(self,loc,split):
+        # Gets direct gap information, splitted into mode contribution
+
+        # Finds the location of the unperturbed and perturbed direct gap + computes the gap energy
+        val = self.valence - 1
+        cond = val + 1
+
+        if split == False:
+
+            loc = loc[1]
+            print('direct',loc)
+
+            ren = np.zeros((self.nmodes,2), dtype=float) #mode, val/cond
+            
+            ren[:,0] = self.zp_ren_modes[0,loc,val,:]*cst.ha_to_ev
+            ren[:,1] = self.zp_ren_modes[0,loc,cond,:]*cst.ha_to_ev
+        
+            if self.units == 'meV':
+                return ren*1000
+            elif self.units == 'eV':
+                return ren
+
+        elif split==True:
+
+            loc = loc[1,:] # T=0, left/right
+
+            ren = np.zeros((self.nmodes,2,2), dtype=float) #mode, val/cond, left/right 
+        
+            #Treat left and right gap
+             
+            for i in range(2):
+
+                ren[:,0,i] = self.zp_ren_modes[0,loc[i],val,:]*cst.ha_to_ev
+                ren[:,1,i] = self.zp_ren_modes[0,loc[i],cond,:]*cst.ha_to_ev
+       
+            if self.units == 'meV':
+                return ren*1000
+            elif self.units == 'eV':
+                return ren
+
+    def get_indirect_mode_info(self,loc,split):
+        # Gets indirect gap information, splitted into mode contribution
+
+        # Finds the location of the unperturbed and perturbed direct gap + computes the gap energy
+        val = self.valence - 1
+        cond = val + 1
+
+        if split == False:
+
+            loc = loc[1,:] #T=0, val/cond
+            print('indirect',loc)
+
+            ren = np.zeros((self.nmodes,2), dtype=float) #mode, val/cond
+            
+            ren[:,0] = self.zp_ren_modes[0,loc[0],val,:]*cst.ha_to_ev
+            ren[:,1] = self.zp_ren_modes[0,loc[1],cond,:]*cst.ha_to_ev
+        
+            if self.units == 'meV':
+                return ren*1000
+            elif self.units == 'eV':
+                return ren
+
+        elif split==True:
+
+            loc = loc[1,:,:] # T=0, left/right, val/cond
+
+            ren = np.zeros((self.nmodes,2,2), dtype=float) #mode, val/cond, left/right 
+        
+            #Treat left and right gap
+             
+            for i in range(2):
+
+                ren[:,0,i] = self.zp_ren_modes[0,loc[i,0],val,:]*cst.ha_to_ev
+                ren[:,1,i] = self.zp_ren_modes[0,loc[i,1],cond,:]*cst.ha_to_ev
+       
+            if self.units == 'meV':
+                return ren*1000
+            elif self.units == 'eV':
+                return ren
+
+
+              
 
     def write_corrections(self):
         # Write the renormalized array in a text file
@@ -1317,6 +1422,28 @@ class EigenvalueCorrections(object):
             if self.gap_ren:
                 if self.reduce_path and self.split:
                     data[:,:,:] = self.indirect_gap_renorm_band2[:,:,:]
+
+            # Mode decomposition data
+            data = dts.createVariable('gap_renormalization_by_modes','d', ('number_of_modes','cplex'))
+            data.units = self.units
+            if self.modes:
+                data[:,:] = self.gap_renorm_modes[:,:]
+
+            data = dts.createVariable('gap_renormalization_by_modes_split','d', ('number_of_modes','cplex','cplex'))
+            data.units = self.units
+            if self.modes and self.split:
+                data[:,:,:] = self.gap_renorm_modes_split[:,:,:]
+
+            data = dts.createVariable('indirect_gap_renormalization_by_modes','d', ('number_of_modes','cplex'))
+            data.units = self.units
+            if self.modes:
+                data[:,:] = self.indirect_gap_renorm_modes[:,:]
+
+            data = dts.createVariable('indirect_gap_renormalization_by_modes_split','d', ('number_of_modes','cplex','cplex'))
+            data.units = self.units
+            if self.modes and self.split:
+                data[:,:,:] = self.indirect_gap_renorm_modes_split[:,:,:]
+
 
             ## Reduced path renormalization
 #            if self.reduce_path:
