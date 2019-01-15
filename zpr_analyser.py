@@ -373,7 +373,8 @@ class EigenvalueCorrections(object):
             if self.modes:
                 self.td_ren = self.epc.zp_ren_modes
                 self.td_ren = np.einsum('vskn->skn',self.td_ren)
-            self.td_ren = self.epc.zp_ren
+            else:
+                self.td_ren = self.epc.zp_ren
             self.td_ren = np.expand_dims(self.td_ren, axis=3) 
             print(self.td_ren)
 
