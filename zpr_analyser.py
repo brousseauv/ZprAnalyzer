@@ -1236,10 +1236,7 @@ class EigenvalueCorrections(object):
             dts.createDimension('number_of_temperatures', self.ntemp)
 
             dts.createDimension('number_of_qpoints', self.nqpt)
-            if self.modes:
-                dts.createDimension('number_of_modes',self.nmodes)
-            else:
-                dts.createDimension('number_of_modes',3*self.natom)
+            dts.createDimension('number_of_modes',3*self.natom)
 
             # Create and write variables
             ## Bare variables
