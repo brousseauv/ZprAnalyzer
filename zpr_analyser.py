@@ -1224,7 +1224,7 @@ class EigenvalueCorrections(object):
 
             # Create dimensions
             dts.createDimension('number_of_spins', self.nsppol)
-           
+            dts.createDimension('number_of_atoms', self.natom) 
             dts.createDimension('number_of_kpoints', self.nkpt)
             dts.createDimension('number_of_bands', self.max_band)
             dts.createDimension('number_of_bands_contr', self.nband_contr)
