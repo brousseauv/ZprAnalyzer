@@ -721,22 +721,22 @@ class EigenvalueCorrections(object):
                     kpts = self.reduced_kpath
 
                     if self.modes:
-                        self.gap_renorm_modes = self.get_mode_info(self.gap_loc,False)
+                        self.gap_renorm_modes = self.get_mode_info(self.gap_loc,self.reduced_zp_ren_modes,False)
 
                         if self.split:
-                            self.gap_renorm_modes_split = self.get_mode_info(self.gap_loc2,True)
+                            self.gap_renorm_modes_split = self.get_mode_info(self.gap_loc2,self.reduced_zp_ren_modes,True)
 
                     if self.indirect:
                         self.indirect_gap_loc, self.indirect_gap_energy, self.indirect_gap_renorm, self.indirect_gap_energy_band, self.indirect_gap_renorm_band = self.get_indirect_gap_info(self.reduced_eig0, self.reduced_eigcorr, False)
 
                         if self.modes:
-                            self.indirect_gap_renorm_modes = self.get_indirect_mode_info(self.indirect_gap_loc, False)
+                            self.indirect_gap_renorm_modes = self.get_indirect_mode_info(self.indirect_gap_loc, self.reduced_zp_ren_modes,False)
 
                         if self.split:
                             self.indirect_gap_loc2, self.indirect_gap_energy2, self.indirect_gap_renorm2, self.indirect_gap_energy_band2, self.indirect_gap_renorm_band2 = self.get_indirect_gap_info(self.reduced_eig0, self.reduced_eigcorr, True)
 
                             if self.modes:
-                                self.indirect_gap_renorm_modes_split = self.get_indirect_mode_info(self.indirect_gap_loc2, True)
+                                self.indirect_gap_renorm_modes_split = self.get_indirect_mode_info(self.indirect_gap_loc2, self.reduced_zp_ren_modes, True)
                 
                 else:
                     # The non-reduced option does not have as many possibilities as the reduced one... anyway if I have only gamma, it will reduce to itself! So, i could simply
@@ -1035,7 +1035,7 @@ class EigenvalueCorrections(object):
             elif self.units == 'eV':
                 return loc, ener, ren, ener_band, ren_band
 
-    def get_mode_info(self,loc,split):
+    def get_mode_info(self,loc, mode_ren, split):
         # Gets direct gap information, splitted into mode contribution
 
         # Finds the location of the unperturbed and perturbed direct gap + computes the gap energy
@@ -1048,8 +1048,8 @@ class EigenvalueCorrections(object):
 
             ren = np.zeros((self.nmodes,2), dtype=float) #mode, val/cond
             
-            ren[:,0] = self.zp_ren_modes[0,loc,val,:]*cst.ha_to_ev
-            ren[:,1] = self.zp_ren_modes[0,loc,cond,:]*cst.ha_to_ev
+            ren[:,0] = mode_ren[0,loc,val,:]*cst.ha_to_ev
+            ren[:,1] = mode_ren[0,loc,cond,:]*cst.ha_to_ev
         
             if self.units == 'meV':
                 return ren*1000
@@ -1066,15 +1066,15 @@ class EigenvalueCorrections(object):
              
             for i in range(2):
 
-                ren[:,0,i] = self.zp_ren_modes[0,loc[i],val,:]*cst.ha_to_ev
-                ren[:,1,i] = self.zp_ren_modes[0,loc[i],cond,:]*cst.ha_to_ev
+                ren[:,0,i] = mode_ren[0,loc[i],val,:]*cst.ha_to_ev
+                ren[:,1,i] = mode_ren[0,loc[i],cond,:]*cst.ha_to_ev
        
             if self.units == 'meV':
                 return ren*1000
             elif self.units == 'eV':
                 return ren
 
-    def get_indirect_mode_info(self,loc,split):
+    def get_indirect_mode_info(self,loc,mode_ren,split):
         # Gets indirect gap information, splitted into mode contribution
 
         # Finds the location of the unperturbed and perturbed direct gap + computes the gap energy
@@ -1087,8 +1087,8 @@ class EigenvalueCorrections(object):
 
             ren = np.zeros((self.nmodes,2), dtype=float) #mode, val/cond
             
-            ren[:,0] = self.zp_ren_modes[0,loc[0],val,:]*cst.ha_to_ev
-            ren[:,1] = self.zp_ren_modes[0,loc[1],cond,:]*cst.ha_to_ev
+            ren[:,0] = mode_ren[0,loc[0],val,:]*cst.ha_to_ev
+            ren[:,1] = mode_ren[0,loc[1],cond,:]*cst.ha_to_ev
         
             if self.units == 'meV':
                 return ren*1000
@@ -1105,8 +1105,8 @@ class EigenvalueCorrections(object):
              
             for i in range(2):
 
-                ren[:,0,i] = self.zp_ren_modes[0,loc[i,0],val,:]*cst.ha_to_ev
-                ren[:,1,i] = self.zp_ren_modes[0,loc[i,1],cond,:]*cst.ha_to_ev
+                ren[:,0,i] = mode_ren[0,loc[i,0],val,:]*cst.ha_to_ev
+                ren[:,1,i] = mode_ren[0,loc[i,1],cond,:]*cst.ha_to_ev
        
             if self.units == 'meV':
                 return ren*1000
