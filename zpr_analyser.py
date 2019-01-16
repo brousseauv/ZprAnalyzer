@@ -447,8 +447,9 @@ class EigenvalueCorrections(object):
                     for t in range(self.ntemp):
                         self.reduced_contr_qpt[:,:,:,:,t] = self.average_kpts(self.reduced_kpts_index, self.contr_qpt[:,:,:,:,t], self.nqpt)
             else:
-                self.reduced_zp_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nmodes))
-                self.reduced_zp_ren_modes = self.average_kpts(self.reduced_kpts_index, self.zp_ren_modes, self.nmodes)
+                if modes:
+                    self.reduced_zp_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nmodes))
+                    self.reduced_zp_ren_modes = self.average_kpts(self.reduced_kpts_index, self.zp_ren_modes, self.nmodes)
 
 
             if self.full_contribution or self.split_contribution:
