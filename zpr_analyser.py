@@ -103,6 +103,7 @@ class EPCfile(CDFfile):
         super(EPCfile, self).__init__(*args, **kwargs)
         self.eig0 = None
         self.kpoints = None
+        self.natom = None
         self.temp = None
         self.zp_ren = None
         self.td_ren = None
@@ -124,6 +125,7 @@ class EPCfile(CDFfile):
 
         with nc.Dataset(fname, 'r') as ncdata:
 
+            self.natom = len(ncdata.dimensions['number_of_atoms'])
             self.eig0 = ncdata.variables['eigenvalues'][:,:,:]
             self.kpoints = ncdata.variables['reduced_coordinates_of_kpoints'][:,:]
             self.temp = ncdata.variables['temperatures'][:]
@@ -350,6 +352,7 @@ class EigenvalueCorrections(object):
         self.nsppol = self.epc.nsppol
         self.eig0 = self.epc.eig0
         self.kpoints = self.epc.kpoints
+        self.natom = self.epc.natom
         self.nqpt = self.epc.nqpt
         self.temp = self.epc.temp
         self.nkpt = self.epc.nkpt
@@ -376,7 +379,6 @@ class EigenvalueCorrections(object):
             else:
                 self.td_ren = self.epc.zp_ren
             self.td_ren = np.expand_dims(self.td_ren, axis=3) 
-            print(self.td_ren)
 
             # Change ntemp to 1
             self.ntemp = 1
@@ -921,7 +923,6 @@ class EigenvalueCorrections(object):
         #cond = self.bands_to_print[1]-1
         val = self.valence - 1
         cond = val + 1
-        print(val,cond) 
 
         if split == False:
 
@@ -947,9 +948,7 @@ class EigenvalueCorrections(object):
             for i in range(self.ntemp):
            
                 arrc = pert[0,:,cond,i]
-                print(arrc)
                 arrv = pert[0,:,val,i]
-                print(arrv)
                 loc[i+1,0] = np.argmax(arrv)
                 loc[i+1,1] = np.argmin(arrc)
                 ener_band[i+1,0] = arrv[loc[i+1,0]]*cst.ha_to_ev 
@@ -1046,7 +1045,6 @@ class EigenvalueCorrections(object):
         if split == False:
 
             loc = loc[1]
-            print('direct',loc)
 
             ren = np.zeros((self.nmodes,2), dtype=float) #mode, val/cond
             
@@ -1086,7 +1084,6 @@ class EigenvalueCorrections(object):
         if split == False:
 
             loc = loc[1,:] #T=0, val/cond
-            print('indirect',loc)
 
             ren = np.zeros((self.nmodes,2), dtype=float) #mode, val/cond
             
@@ -1242,7 +1239,7 @@ class EigenvalueCorrections(object):
             if self.modes:
                 dts.createDimension('number_of_modes',self.nmodes)
             else:
-                dts.createDimension('number_of_modes',9)
+                dts.createDimension('number_of_modes',3*self.natom)
 
             # Create and write variables
             ## Bare variables
@@ -1519,7 +1516,6 @@ class EigenvalueCorrections(object):
             data = dts.createVariable('reduced_fan_occterm', 'd',('number_of_spins','number_of_reduced_kpoints','number_of_bands_contr','number_of_bands_contr','number_of_modes','number_of_temperatures',
                 'number_of_qpoints','cplex'))
             if self.reduce_path and self.full_contribution:
-                print(np.shape(self.fan_occterm))
                 data[:,:,:,:,:,:,:,:] = self.reduced_fan_occterm[:,:,:,:,:,:,:,:]
 
             data = dts.createVariable('qpt_weight','d',('number_of_qpoints'))
