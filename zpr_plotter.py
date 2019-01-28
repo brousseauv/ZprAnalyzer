@@ -59,7 +59,6 @@ class GAPfile(CDFfile):
     def read_nc(self, fname=None):
 
         fname = fname if fname else self.fname
-        print(fname)
         super(GAPfile, self).read_nc(fname)
 
         with nc.Dataset(fname, 'r') as ncdata:
@@ -67,6 +66,30 @@ class GAPfile(CDFfile):
             self.explicit_gap_energies = ncdata.variables['gap_energies'][:]
             self.explicit_pressures = ncdata.variables['pressures'][:]
             self.explicit_gap_energies_units = ncdata.variables['gap_energies'].getncattr('units')
+
+class EXPfile(CDFfile):
+
+    def __init__(self, *args, **kwargs):
+
+        super(EXPfile, self).__init__(*args,**kwargs)
+
+        self.xaxis = None
+        self.yaxis = None
+        self.ndata = None
+
+    def read_nc(self, fname=None):
+
+        fname = fname if fname else self.fname
+        super(EXPfile, self).read_nc(fname)
+
+        with nc.Dataset(fname,'r') as ncdata:
+
+            self.xaxis = ncdata.variables['ax1'][:]
+            self.yaxis = ncdata.variables['ax2'][:]
+            self.ndata = len(self.xaxis)
+            self.xaxis_units = ncdata.variables['ax1'].getncattr('units')
+            self.yaxis_units = ncdata.variables['ax2'].getncattr('units')
+
 
 class ZPRfile(CDFfile):
         
@@ -258,6 +281,10 @@ class ZPR_plotter(object):
     split_contribution = False
     modes = False
     verbose = False
+    zero_gap_value = None
+    experimental_data = None
+    expdata = None
+    zero_gap_units = 'eV'
 
     def __init__(self,
 
@@ -313,6 +340,8 @@ class ZPR_plotter(object):
             modes = False,
             degen = None,
             verbose = False,
+            zero_gap_value = None,
+            zero_gap_units = 'eV',
 
             # Parameters
             nsppol = None,
@@ -330,6 +359,8 @@ class ZPR_plotter(object):
             pressure = None,
             crit_pressure = None,
             explicit_pressures = None,
+            experimental_data = None,
+            expdata = None,
 
             units = 'eV',
             gap_units = None,
@@ -374,6 +405,9 @@ class ZPR_plotter(object):
         self.pressure = pressure
         self.crit_pressure = crit_pressure
         self.verbose = verbose
+        self.zero_gap_value = zero_gap_value 
+        self.zero_gap_units = zero_gap_units
+        self.experimental_data = experimental_data
 
         self.renormalization = renormalization
         self.spectral = spectral
@@ -396,7 +430,10 @@ class ZPR_plotter(object):
 
         self.set_rootname(rootname)
 
-
+        if self.experimental_data is not None:
+            self.expdata = EXPfile(self.experimental_data)
+            self.expdata.read_nc()
+    
     def check_input(self):
         
         # Checks that all required input is provided
@@ -430,6 +467,29 @@ class ZPR_plotter(object):
 
         if f.fname:
             f.read_nc()
+
+    def read_expdata_file(self):
+
+        with open(self.experimental_data,'r') as f:
+
+            for i in range(4):
+                f.readline()
+
+            ndata = f.readline()
+            f.readline()
+
+            data = np.empty((ndata,2))
+
+            for i in range(ndata):
+                line = f.readline().split(',')
+                data[i,0] = line[0]
+                data[i,1] = line[1]
+
+        return data
+            
+            
+
+       
 
     def set_rootname(self, root):
         self.rootname = root
@@ -757,7 +817,7 @@ class ZPR_plotter(object):
             self.ntemp = self.zpr.ntemp
             self.temp = self.zpr.temp
             self.kpoints = self.zpr.kpoints
-            
+  
             # Add indirect/direct gap information
             if self.indirect:
                 if self.split:
@@ -779,15 +839,64 @@ class ZPR_plotter(object):
 
 
             if self.split:
-                _arr[0][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                _arr2[0][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                if self.expdata:
+                    raise Exception("Experimental data option not implemented for split yet")
+
+                else:
+                    _arr[0][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[0][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
 
             else:
-                _arr[0][0].plot(self.temp, self.gap_ren, marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                if self.expdata:
+                    if self.gap_units == self.expdata.yaxis_units:
+                        # they are both the same, no need to convert
+                        if self.zero_gap_value:
+                            if self.zero_gap_units == self.gap_units:
+                                shift = self.zero_gap_value-self.gap_ren[0]
+                            else:
+                                if self.zero_gap_units == 'eV' and self.gap_units == 'meV':
+                                    shift = self.zero_gap_value*1E3-self.gap_ren[0]
+                                elif self.zero_gap_units == 'meV' and self.gap_units == 'eV':
+                                    shift = self.zero_gap_value*1E-3-self.gap_ren[0]
+                                else:
+                                    raise Exception('Please provide zero gap value in eV or meV')
+
+                        else:
+                            shift = 0.
+
+                        _arr[0][0].plot(self.temp, self.gap_ren+shift, marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                        _arr[0][0].plot(self.expdata.xaxis, self.expdata.yaxis, marker='s', linestyle='None',color='black')
+
+                    else:
+                        # the only case I write for now is meV to eV. Add Hartree to eV later??
+                        if self.gap_units == 'meV' and self.expdata.yaxis_units == 'eV':
+
+                            if self.expdata.xaxis_units != 'K':
+                                raise Exception('Temperature axis must be in Kelvin')
+
+                            if self.zero_gap_value:
+                                if self.zero_gap_units == 'eV':
+                                    shift = self.zero_gap_value-self.gap_ren[0]*1E-3
+                                elif self.zero_gap_units == 'meV':
+                                    shift = (self.zero_gap_value-self.gap_ren[0])*1E-3
+                                else:
+                                    raise Exception('Please provide zero gap value in eV or meV')
+                            else:
+                                shift = 0.
+
+                            _arr[0][0].plot(self.temp, self.gap_ren*1E-3+shift, marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                            _arr[0][0].plot(self.expdata.xaxis, self.expdata.yaxis, marker='s', linestyle='None',color='black')
+
+       
+                else:
+                    _arr[0][0].plot(self.temp, self.gap_ren, marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
 
         self.set_xaxis(_arr[0][0], self.temp)
-        self.set_vrefs(_arr[0][0], self.temp, 0.)
-        self.set_yaxis(_arr[0][0], 'Gap renormalization ({})'.format(self.gap_units))
+#        self.set_vrefs(_arr[0][0], self.temp, 0.)
+        if self.expdata:
+            self.set_yaxis(_arr[0][0], 'Gap energy ({})'.format(self.expdata.yaxis_units))
+        else:
+            self.set_yaxis(_arr[0][0], 'Gap renormalization ({})'.format(self.gap_units))
         self.set_legend_gap(_arr[0][0])
         self.set_main_title(fig) 
 
@@ -3770,6 +3879,9 @@ def plotter(
         split_contribution = False,
         modes = False,
         verbose = False,
+        zero_gap_value = None,
+        zero_gap_units = 'eV',
+        experimental_data = None,
 
         **kwargs):
 
@@ -3810,6 +3922,9 @@ def plotter(
             band_numbers = band_numbers,
             point_for_se = point_for_se,
             temp_to_print = temp_to_print,
+            zero_gap_value = zero_gap_value,
+            zero_gap_units = zero_gap_units,
+            experimental_data = experimental_data,
 
             subplots = subplots,
             main_title = main_title,
@@ -3836,27 +3951,34 @@ def plotter(
             **kwargs)
             
     
+        # Plot the renormalized bandstructure
         if renormalization:
             zpr_plot.plot_zpr()
 
+        #Plot the self-energy
         if senergy:
             zpr_plot.plot_self_energy()
-
+        
+        # Plot the spectral function
         if spectral:
             zpr_plot.plot_spectral_function()
 
+        # Plot the gap as a function of temperature
         if gap:
             if separate_bands:
                 zpr_plot.plot_gap_separate()
             else:
                 zpr_plot.plot_gap()
 
+        # plot valence band and conduction band ZPR separately
         if vbcb:
             zpr_plot.plot_vbcb()
 
+        
         if modes:
             zpr_plot.plot_mode_decomposition()
 
+        # Plot gap (T) as a function of pressure
         if pgap:
             if indirect:
                 if separate_bands:
