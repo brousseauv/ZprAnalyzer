@@ -3801,14 +3801,20 @@ class ZPR_plotter(object):
 
     def save_figure(self,g):
 
+        create_directory('figures/')
+
         if self.savefile:
             g.savefig('figures/'+self.savefile+'.png')
 
     def save_figure2(self,g):
 
+        create_directory('figures/')
+
         g.savefig('figures/unperturbed_energy.png')
 
     def save_figure_split(self,g1,g2):
+
+        create_directory('figures/')
 
         if self.savefile:
             g1.savefig('figures/{}_lgap.png'.format(self.savefile))
@@ -3816,6 +3822,14 @@ class ZPR_plotter(object):
 
 
 ##########################
+# Create a directory if it does not exist
+def create_directory(fname):
+
+    dirname = os.path.dirname(fname)
+    if not dirname:
+        return
+    if not os.path.exists(dirname):
+        os.system('mkdir -p ' + dirname)
 
 # Main function
 
