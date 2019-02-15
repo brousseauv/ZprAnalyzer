@@ -260,9 +260,9 @@ class QptContribution(object):
         print('    VBM : {} {}'.format(zpr[0],self.units))
         print('    CBM : {} {}'.format(zpr[1],self.units))
 
-        print('acoustic : {}'.format(np.einsum('qn->n', self.acoustic)))
-        print('TO : {}'.format(np.einsum('qn->n', self.TO)))
-        print('LO : {}'.format(np.einsum('qn->n', self.LO)))
+        print('acoustic : {}'.format(np.einsum('q,qn->n', self.wtq,self.acoustic)))
+        print('TO : {}'.format(np.einsum('q,qn->n', self.wtq,self.TO)))
+        print('LO : {}'.format(np.einsum('q,qn->n', self.wtq,self.LO)))
 
 
 #    def write_netcdf(self):
