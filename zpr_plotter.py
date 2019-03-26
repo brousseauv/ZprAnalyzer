@@ -3523,11 +3523,20 @@ class ZPR_plotter(object):
                 self.set_xaxis(arr[0,iplot],self.omega_se)
                 self.set_vrefs(arr[0,iplot],self.omega_se, 0.)
 
-
+            #    # Add the x=y reference line, which will indicate the fully dynamical renormalized eigenvalue. See Antonius PRB 2016, Fig.1
+            #    x = np.linspace(self.xlims[0],self.xlims[1],50)
+            #    arr[0,iplot].plot(x,x,color='black',linestyle='dashed')
 
         if not self.ylims:
 
             self.ylims = arr[0,iplot].get_ylim()
+
+
+        # Add the x=y reference line, which will indicate the fully dynamical renormalized eigenvalue. See Antonius PRB 2016, Fig.1
+        for iplot in range(plot_qty):
+            x = np.linspace(self.xlims[0],self.xlims[1],50)
+            arr[0,iplot].plot(x,x,color='black',linestyle='dashed')
+
 
 
         # Set axis properties
