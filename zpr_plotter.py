@@ -3468,6 +3468,9 @@ class ZPR_plotter(object):
         plot_qty = len(self.bands_to_print)
         file_qty = len(self.zpr_fnames)
 
+        if file_qty > len(self.color):
+            raise Exception('color array must have at least {} entries, but it has only {}'.format(file_qty,len(self.color)))
+
         if self.units == 'eV':
             self.fermi = self.fermi*cst.ha_to_ev
         elif self.units == 'meV':
@@ -3503,12 +3506,14 @@ class ZPR_plotter(object):
                 self.eig0 = self.zpr.eig0*cst.ha_to_ev
                 self.eigcorr = self.zpr.eigcorr*cst.ha_to_ev
                 self.self_energy = self.self_energy*cst.ha_to_ev
+                self.omega_se = self.omega_se*cst.ha_to_ev
 
             elif self.units is 'meV':
                 self.eig0 = self.zpr.eig0*cst.ha_to_ev*1000
                 self.eigcorr = self.zpr.eigcorr*cst.ha_to_ev*1000
                 self.ylims = self.ylims*1000
                 self.self_energy = self.self_energy*cst.ha_to_ev*1000
+                self.omega_se = self.omega_se*cst.ha_to_ev*1000
 
 
             for iplot in range(plot_qty):
@@ -3532,8 +3537,9 @@ class ZPR_plotter(object):
             self.set_legend_se(arr[0,i])
             self.set_hrefs(self.ylims, arr[0,i],0.,'black')
 
-        self.set_title(arr[0,0],'Valence band')
-        self.set_title(arr[0,1], 'Conduction band')
+        if plot_qty == 2:
+            self.set_title(arr[0,0],'Valence band')
+            self.set_title(arr[0,1], 'Conduction band')
 
         self.set_main_title(fig)
         self.save_figure(fig)
@@ -3613,7 +3619,7 @@ class ZPR_plotter(object):
                         tick.set_horizontalalignment(self.xticks_alignment[itick]) 
 
         if self.senergy:
-            f.set_xlabel('w-e^0', fontsize=18)
+            f.set_xlabel('w-e^0 ({})'.format(self.units), fontsize=18)
             if self.xlims:
                 f.set_xlim(self.xlims[0], self.xlims[-1])
             else:
