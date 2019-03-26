@@ -343,7 +343,7 @@ class EigenvalueCorrections(object):
         if self.units is not 'eV' and self.units is not 'meV':
             raise Exception('Units must be eV or meV')
         if not self.valence:
-            raise Exception('Must provide the last valence band number')
+            raise Exception('Must provide the last valence band number as valence')
 
         # Read input files
         self.read_files()

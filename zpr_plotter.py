@@ -445,7 +445,7 @@ class ZPR_plotter(object):
             raise Exception('Please specify ONLY ONE quantity to plot from renormalization, self-energy and spectral function')
 
         if self.senergy:
-            if not self.point_for_se:
+            if self.point_for_se is None:
                 raise Exception('Must provide a kpoint index to treat in point_for_se')  
     
             if not self.bands_to_print:
@@ -3476,7 +3476,7 @@ class ZPR_plotter(object):
         elif self.units == 'meV':
             self.fermi = self.fermi*1000
 
-        fig, arr = plt.subplots( 1, plot_qty, squeeze = False, sharey = True,  figsize = self.figsize)
+        fig, arr = plt.subplots( plot_qty,1, squeeze = False, sharex = True,  figsize = self.figsize)
 
         # Read and treat all input files
         for ifile, zpr_file in enumerate(self.zpr_fnames):
@@ -3518,37 +3518,41 @@ class ZPR_plotter(object):
 
             for iplot in range(plot_qty):
     
-                arr[0,iplot].plot(self.omega_se, self.self_energy[0,self.point_for_se, self.bands_to_print[iplot]-1, :, 0], color=self.color[ifile],label=self.title[ifile], linewidth=1.5)
+                arr[iplot,0].plot(self.omega_se, self.self_energy[0,self.point_for_se, self.bands_to_print[iplot]-1, :, 0], color=self.color[ifile],label=self.labels[ifile], linewidth=1.5)
 
-                self.set_xaxis(arr[0,iplot],self.omega_se)
-                self.set_vrefs(arr[0,iplot],self.omega_se, 0.)
+                self.set_vrefs(arr[iplot,0],self.omega_se, 0.)
 
+
+            self.set_xaxis(arr[plot_qty-1,0],self.omega_se)
             #    # Add the x=y reference line, which will indicate the fully dynamical renormalized eigenvalue. See Antonius PRB 2016, Fig.1
             #    x = np.linspace(self.xlims[0],self.xlims[1],50)
-            #    arr[0,iplot].plot(x,x,color='black',linestyle='dashed')
+            #    arr[iplot,0].plot(x,x,color='black',linestyle='dashed')
 
         if not self.ylims:
 
-            self.ylims = arr[0,iplot].get_ylim()
+            self.ylims = arr[iplot,0].get_ylim()
 
 
         # Add the x=y reference line, which will indicate the fully dynamical renormalized eigenvalue. See Antonius PRB 2016, Fig.1
         for iplot in range(plot_qty):
             x = np.linspace(self.xlims[0],self.xlims[1],50)
-            arr[0,iplot].plot(x,x,color='black',linestyle='dashed')
+            arr[iplot,0].plot(x,x,color='black',linestyle='dashed')
+
+            if self.title is not None:
+                self.set_title(arr[iplot,0],self.title[iplot])
 
 
 
-        # Set axis properties
-        self.set_yaxis(arr[0,0],'Re[Self-energy] ({})'.format(self.units))
+            # Set axis properties
+            self.set_yaxis(arr[iplot,0],'Re[Self-energy] ({})'.format(self.units))
 
-        for i in range(plot_qty):
-            self.set_legend_se(arr[0,i])
-            self.set_hrefs(self.ylims, arr[0,i],0.,'black')
+            self.set_hrefs(self.ylims, arr[iplot,0],0.,'black')
 
-        if plot_qty == 2:
-            self.set_title(arr[0,0],'Valence band')
-            self.set_title(arr[0,1], 'Conduction band')
+        self.set_legend_se(arr[0,0])
+
+#        if plot_qty == 2:
+#            self.set_title(arr[0,0],'Valence band')
+#            self.set_title(arr[0,1], 'Conduction band')
 
         self.set_main_title(fig)
         self.save_figure(fig)
@@ -3809,7 +3813,7 @@ class ZPR_plotter(object):
         # Set main title
         if self.main_title:
             if self.senergy:
-                t = self.main_title+'\nKpt : '+str(self.kpoints[self.point_for_se])
+                t = self.main_title+', Kpt : '+str(self.kpoints[self.point_for_se])
             else:
                 t = self.main_title
             g.suptitle(t, fontsize=18)
