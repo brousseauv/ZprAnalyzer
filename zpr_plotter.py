@@ -3807,8 +3807,8 @@ class ZPR_plotter(object):
 
     def set_legend_se(self,f):
 
-        if self.title:
-            f.legend()
+        if self.labels:
+            f.legend(loc=1)
 
     def set_legend_gap(self, f):
         #f.legend(numpoints=1, loc=3, fontsize=16)
