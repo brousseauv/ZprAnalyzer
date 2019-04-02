@@ -251,6 +251,9 @@ class ZPR_plotter(object):
     ylims = None
     yticks = None
     yminorticks = None
+    cond_ylims = None
+    val_ylims = None
+    gap_ylims = None
     xlims = None
     xticks = None
     xticks_labels = None
@@ -297,6 +300,9 @@ class ZPR_plotter(object):
             ylimits = None,
             yticks = None,
             yminorticks = None,
+            cond_ylims = None,
+            val_ylims = None,
+            gap_ylims = None,
             xlims = None,
             xticks = None,
             xticks_labels = None,
@@ -385,6 +391,9 @@ class ZPR_plotter(object):
         self.ylims = ylims
         self.yticks = yticks
         self.yminorticks = yminorticks
+        self.cond_ylims = cond_ylims
+        self.val_ylims = val_ylims
+        self.gap_ylims = gap_ylims
         self.xlims = xlims
         self.xticks = xticks
         self.xticks_labels = xticks_labels
@@ -1388,14 +1397,13 @@ class ZPR_plotter(object):
           #  plt.subplots_adjust(hspace=0.05, top=0.95) 
 
 
-
         # Read explicit data, if required
         if self.gap_fname is not None:
 
             self.exgap = GAPfile(self.gap_fname, read=False)
             self.read_other_file()
 
-
+            
             if self.exgap.explicit_gap_energies_units == 'eV':
                 self.explicit_gap_energies = self.exgap.explicit_gap_energies*1000
             else:
@@ -1531,7 +1539,8 @@ class ZPR_plotter(object):
                     self.full_energy0[ifile] = self.energy0
                 else:
                     p_index = self.find_pressure_index(self.pressure[ifile])
-                    self.full_energy0[ifile] = self.explicit_energies[p_index]
+                    print(p_index)
+                    self.full_energy0[ifile] = self.explicit_gap_energies[p_index]
 
             if self.gap_fname is not None:
                 if self.split:
@@ -1612,6 +1621,16 @@ class ZPR_plotter(object):
                 self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
 
 
+            else:
+                #trivial side
+                x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_gap_ren[crit_index-1:crit_index+1,T], 1)
+                self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
+                self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
+
+                # topol side
+                x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_gap_ren[crit_index+1:crit_index+3,T], 1)
+                self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
+                self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
 
 #        print(self.extr_pressure1)
 #        print(self.extr_full_gap_energy1)
@@ -1946,27 +1965,27 @@ class ZPR_plotter(object):
             _arr[1,0].set_ylim(limms[1])
 
 
-        if only:
-            _arr[0,0].text(self.explicit_pressures[12],180, r'$\mathbf{Z_2=0}$', fontsize=24) 
-            _arr[0,0].text(self.explicit_pressures[30],180, r'$\mathbf{Z_2=1}$', fontsize=24) 
-
-#            _arr[0,0].text(self.explicit_pressures[5],290, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=26)
-#            _arr[0,0].text(self.explicit_pressures[38],290, r'$\frac{k_z c}{2\pi} = 0.5349$',fontsize=26)
-
-
-            _arr[0,0].text(self.explicit_pressures[12],250, r'WSM 0K', fontsize=26, weight='bold', color='gray')
-            _arr[0,0].text(self.explicit_pressures[25],250, r'WSM 300K', fontsize=26, weight='bold', color='orange')
-
-        else:
-            _arr[1,0].text(self.explicit_pressures[12],180, r'$\mathbf{Z_2=0}$', fontsize=24) 
-            _arr[1,0].text(self.explicit_pressures[30],180, r'$\mathbf{Z_2=1}$', fontsize=24) 
-
-#            _arr[1,0].text(self.explicit_pressures[5],290, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=26)
-#            _arr[1,0].text(self.explicit_pressures[38],290, r'$\frac{k_z c}{2\pi} = 0.5349$',fontsize=26)
-
-
-            _arr[1,0].text(self.explicit_pressures[12],250, r'WSM 0K', fontsize=26, weight='bold', color='gray')
-            _arr[1,0].text(self.explicit_pressures[25],250, r'WSM 300K', fontsize=26, weight='bold', color='orange')
+#        if only:
+#            _arr[0,0].text(self.explicit_pressures[12],180, r'$\mathbf{Z_2=0}$', fontsize=24) 
+#            _arr[0,0].text(self.explicit_pressures[30],180, r'$\mathbf{Z_2=1}$', fontsize=24) 
+#
+##            _arr[0,0].text(self.explicit_pressures[5],290, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=26)
+##            _arr[0,0].text(self.explicit_pressures[38],290, r'$\frac{k_z c}{2\pi} = 0.5349$',fontsize=26)
+#
+#
+#            _arr[0,0].text(self.explicit_pressures[12],250, r'WSM 0K', fontsize=26, weight='bold', color='gray')
+#            _arr[0,0].text(self.explicit_pressures[25],250, r'WSM 300K', fontsize=26, weight='bold', color='orange')
+#
+#        else:
+#            _arr[1,0].text(self.explicit_pressures[12],180, r'$\mathbf{Z_2=0}$', fontsize=24) 
+#            _arr[1,0].text(self.explicit_pressures[30],180, r'$\mathbf{Z_2=1}$', fontsize=24) 
+#
+##            _arr[1,0].text(self.explicit_pressures[5],290, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=26)
+##            _arr[1,0].text(self.explicit_pressures[38],290, r'$\frac{k_z c}{2\pi} = 0.5349$',fontsize=26)
+#
+#
+#            _arr[1,0].text(self.explicit_pressures[12],250, r'WSM 0K', fontsize=26, weight='bold', color='gray')
+#            _arr[1,0].text(self.explicit_pressures[25],250, r'WSM 300K', fontsize=26, weight='bold', color='orange')
 
 
 
@@ -2843,7 +2862,7 @@ class ZPR_plotter(object):
 
  
             else:
-#                self.loc0 = self.zpr.unperturbed_gap_location
+                self.loc0 = self.zpr.unperturbed_indirect_gap_location
 #                self.gap_location = self.zpr.gap_location
                 self.gap_ren = self.zpr.indirect_gap_ren
                 self.band_ren = self.zpr.indirect_gap_ren_band
@@ -2984,7 +3003,9 @@ class ZPR_plotter(object):
                     _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
 
 
-        limms = [[-50.,40.],[-2.,50.],[-70.,40.]]
+        limms = [[-50.,50.],[-2.,50.],[-90.,40.]]
+##########FIX ME : add default data and if condition
+        limms = [self.cond_ylims, self.val_ylims, self.gap_ylims]
         for i in range(3):
 #            lims = _arr[i,0].get_ylim() 
             ylims = limms[i]    
@@ -3882,6 +3903,9 @@ def plotter(
         linestyle = None,
         ylims = None,
         yticks = None,
+        cond_ylims = None,
+        val_ylims = None,
+        gap_ylims = None,
         yminorticks = None,
         xlims = None,
         xticks = None,
@@ -3948,6 +3972,9 @@ def plotter(
             xticks_alignment = xticks_alignment,
             ylims = ylims,
             yticks = yticks,
+            cond_ylims = cond_ylims,
+            val_ylims = val_ylims,
+            gap_ylims = gap_ylims,
             yminorticks = yminorticks,
             figsize = figsize,
 
