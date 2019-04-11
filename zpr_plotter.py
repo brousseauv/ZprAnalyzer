@@ -1086,12 +1086,14 @@ class ZPR_plotter(object):
             self.set_title(_arr2[0][0], self.title[1])
 
         else:
-            self.set_title(_arr[0][0], self.main_title)
+            if self.main_title is not None:
+                self.set_title(_arr[0][0], self.main_title)
 
 ###
 
         self.set_legend_gap(_arr[2][0])
-        self.set_main_title(fig) 
+        if self.main_title is not None:
+            self.set_main_title(fig) 
 
         if self.split:
             self.set_legend_gap(_arr2[2][0])
@@ -1099,7 +1101,8 @@ class ZPR_plotter(object):
             self.set_title(_arr[0][0], self.title[0])
             self.set_title(_arr2[0][0], self.title[1])
 
-            self.set_main_title(fig2)
+            if self.main_title is not None:
+                self.set_main_title(fig2)
 
         if self.split:
             self.save_figure_split(fig,fig2)
