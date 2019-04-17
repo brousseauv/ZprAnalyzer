@@ -611,7 +611,7 @@ class ZPR_plotter(object):
         
                 else:
                     for iband in range(self.max_band):
-                        arr[iplot][ifile].plot(kpt_array, self.eig0[0,:,iband]-self.fermi_td[ifile]+scissor_array[iband], color='k', label='unperturbed')
+                        arr[iplot][ifile].plot(kpt_array, self.eig0[0,:,iband]-self.fermi_td[ifile]+scissor_array[iband], color='k', label='Static T=0')
                         
                         if self.subplots:
                             arr[iplot][ifile].plot(kpt_array, self.eigcorr[0,:,iband,iplot]-self.fermi_td[ifile]+scissor_array[iband], color = self.color[iplot], label=str(self.temp[iplot])+'K')
@@ -1241,7 +1241,7 @@ class ZPR_plotter(object):
                     # figure 1
                     if T==self.temp[0]:
                        
-                        _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black', label='unperturbed')
+                        _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black', label='Static T=0')
                     else:
                         _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black')
     
@@ -1261,7 +1261,7 @@ class ZPR_plotter(object):
                     # figure 2
                     if T==self.temp[0]:
                        
-                        _arr2[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='unperturbed')
+                        _arr2[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
                     else:
                         _arr2[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black')
     
@@ -1284,7 +1284,7 @@ class ZPR_plotter(object):
                 else:
                     if T==self.temp[0]:
                        
-                        _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='d', color='black', label='unperturbed')
+                        _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='d', color='black', label='Static T=0')
                     else:
                         _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='d', color='black')
     
@@ -1652,24 +1652,24 @@ class ZPR_plotter(object):
                     if T==self.temp[0]:
                         ###### FIX ME : keep explicit_pressures and explicit_gap_energies, just get a new crit index for this array! 
                         if self.gap_fname is not None:
-#                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='unperturbed')
+#                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='Static T=0')
                             if self.crit_index2 is not None:
                                 if only:
-                                    _arr[0][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='unperturbed')
+                                    _arr[0][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='unperturbed')
+                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
 
                             else:
                                 if only:
-                                    _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='unperturbed')
+                                    _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='Static T=0')
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='unperturbed')
+                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='Static T=0')
 
                         else:
                             if only:
-                                _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='unperturbed')
+                                _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='Static T=0')
                             else:
-                                _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='unperturbed')
+                                _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='Static T=0')
                     else:
                         if only:
                             _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
@@ -1711,9 +1711,9 @@ class ZPR_plotter(object):
 #
                             if crit_index2 is not None:
                                 if only:
-                                    _arr[0][0].plot(self.explicit_pressures[crit_index2+2,:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='unperturbed')
+                                    _arr[0][0].plot(self.explicit_pressures[crit_index2+2,:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='Static T=0')
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+2:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='unperturbed')
+                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+2:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='Static T=0')
 
                     if only:
                         _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,0], marker='o', linewidth=2.0, color=self.color[T])
@@ -1742,14 +1742,14 @@ class ZPR_plotter(object):
                     if T==self.temp[0]:
                         if self.gap_fname is not None:
                             if only:
-                                _arr2[0][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='unperturbed')
+                                _arr2[0][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
                             else:
-                                arr2[1][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='unperturbed')
+                                arr2[1][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
                         else:
                             if only:
-                                _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='unperturbed')
+                                _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
                             else:
-                                _arr2[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='unperturbed')
+                                _arr2[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
                     else:
                         if only:
                             _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black')
@@ -1795,23 +1795,23 @@ class ZPR_plotter(object):
                     if T==self.temp[0]:
                         ###### FIX ME : keep explicit_pressures and explicit_gap_energies, just get a new crit index for this array! 
                         if self.gap_fname is not None:
-#                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='unperturbed')
+#                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='Static T=0')
                             if crit_index2 is not None:
                                 if only:
-                                     _arr[0][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='unperturbed')
+                                     _arr[0][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='unperturbed')
+                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
                             else:
                                 if only:
-                                     _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='unperturbed')
+                                     _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='Static T=0')
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='unperturbed')
+                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='Static T=0')
 
                         else:
                             if only:
-                                _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='unperturbed')
+                                _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='Static T=0')
                             else:
-                                _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='unperturbed')
+                                _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='Static T=0')
 #                    else:
 #                        _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
     
@@ -2226,12 +2226,12 @@ class ZPR_plotter(object):
                     if T==self.temp[0]:
                         ###### FIX ME : keep explicit_pressures and explicit_gap_energies, just get a new crit index for this array! 
                         if self.gap_fname is not None:
-#                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='unperturbed')
-                            _arr[0][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='unperturbed')
+#                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='Static T=0')
+                            _arr[0][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
 
 
                         else:
-                            _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='unperturbed')
+                            _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='Static T=0')
                     else:
                         _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
     
@@ -2275,9 +2275,9 @@ class ZPR_plotter(object):
                     # figure 2
                     if T==self.temp[0]:
                         if self.gap_fname is not None:
-                            _arr2[0][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='unperturbed')
+                            _arr2[0][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
                         else:
-                            _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='unperturbed')
+                            _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
                     else:
                         _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black')
     
@@ -2304,9 +2304,9 @@ class ZPR_plotter(object):
                 else:
                     if T==self.temp[0]:
                         if self.gap_fname is not None:
-                            _arr[0][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s],marker='d', color='black', label='unperturbed')
+                            _arr[0][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s],marker='d', color='black', label='Static T=0')
                         else:
-                            _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='d', color='black', label='unperturbed')
+                            _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='d', color='black', label='Static T=0')
                     else:
                         _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='d', color='black')
     
