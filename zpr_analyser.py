@@ -116,6 +116,10 @@ class EPCfile(CDFfile):
         self.fan_g2 = None
         self.zpr_ren_modes = None
         self.qpt_weight = None
+        self.fan_occ = None
+        self.fan_unocc = None
+        self.dw_occ = None
+        self.dw_unocc = None
 
     # Open the EPC file and read it
     def read_nc(self, fname=None):
@@ -130,6 +134,11 @@ class EPCfile(CDFfile):
             self.kpoints = ncdata.variables['reduced_coordinates_of_kpoints'][:,:]
             self.temp = ncdata.variables['temperatures'][:]
             self.td_ren = ncdata.variables['temperature_dependent_renormalization'][:,:,:,:]
+            self.fan_occ = ncdata.variables['temperature_dependent_renormalization_fan_occ'][:,:,:,:]
+            self.fan_unocc = ncdata.variables['temperature_dependent_renormalization_fan_unocc'][:,:,:,:]
+            self.ddw_occ = ncdata.variables['temperature_dependent_renormalization_ddw_occ'][:,:,:,:]
+            self.ddw_unocc = ncdata.variables['temperature_dependent_renormalization_ddw_unocc'][:,:,:,:]
+
             self.zp_ren = ncdata.variables['zero_point_renormalization'][:,:,:]
             self.zp_ren_modes = ncdata.variables['zero_point_renormalization_by_modes'][:,:,:,:]
             self.nqpt = len(ncdata.dimensions['number_of_qpoints'])
@@ -232,6 +241,7 @@ class EigenvalueCorrections(object):
     reduce_path = False
     contribution = False
     full_contribution = False
+    split_occupied_subspace = False
     gap_ren = False
     temperature = False
     senergy = False
@@ -240,7 +250,7 @@ class EigenvalueCorrections(object):
     indirect = False
     split = False,
     modes = False
-    split_contribution = False,
+    split_contribution = False
 
     def __init__(self,
 
@@ -259,6 +269,7 @@ class EigenvalueCorrections(object):
                 split = False,
                 modes = False,
                 split_contribution = False,
+                split_occupied_subspace = False,
 
                 #Parameters
                 nsppol = None,
@@ -328,6 +339,7 @@ class EigenvalueCorrections(object):
         self.contribution = contribution
         self.full_contribution = full_contribution
         self.split_contribution = split_contribution
+        self.split_occupied_subspace = split_occupied_subspace
         self.gap_ren = gap_ren
         self.units = units
         self.temperature = temperature
@@ -369,7 +381,7 @@ class EigenvalueCorrections(object):
 
         if self.temperature:
             if self.modes:
-                raise Exception('Mode decomposition only works in static theory. Put Temperature to False.')
+                raise Exception('Mode decomposition only implemented at T=0 theory. Put Temperature to False.')
             else:
                 self.td_ren = self.epc.td_ren
         else:
@@ -421,6 +433,12 @@ class EigenvalueCorrections(object):
             self.fan_occterm = self.epc.fan_occterm
             self.qpt_weight = self.epc.qpt_weight
             self.ddw_tdep = self.epc.ddw_tdep
+
+        if self.split_occupied_subspace:
+            self.fan_occ = self.epc.fan_occ
+            self.fan_unocc = self.epc.fan_unocc
+            self.ddw_occ = self.epc.ddw_occ
+            self.ddw_unocc = self.epc.ddw_unocc
 
         # Average on symmetry-equivalent kpoints
         if self.reduce_path :
@@ -507,7 +525,13 @@ class EigenvalueCorrections(object):
                 self.reduced_self_energy= np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nfreq,2))
                 self.reduced_self_energy[:,:,:,:,0] = self.average_kpts(self.reduced_kpts_index, self.self_energy[:,:,:,:,0], self.nfreq)
                 self.reduced_self_energy[:,:,:,:,1] = self.average_kpts(self.reduced_kpts_index, self.self_energy[:,:,:,:,1], self.nfreq)
-                
+
+            if self.split_occupied_subspace:
+               self.reduced_fan_occ = self.average_kpts(self.reduced_kpts_index, self.fan_occ, self.ntemp) 
+               self.reduced_fan_unocc = self.average_kpts(self.reduced_kpts_index, self.fan_unocc, self.ntemp) 
+               self.reduced_ddw_occ = self.average_kpts(self.reduced_kpts_index, self.ddw_occ, self.ntemp) 
+               self.reduced_ddw_unocc = self.average_kpts(self.reduced_kpts_index, self.ddw_unocc, self.ntemp) 
+
 
 
         
@@ -1523,7 +1547,29 @@ class EigenvalueCorrections(object):
             data = dts.createVariable('ddw_tdep','d',('number_of_modes','number_of_temperatures','number_of_qpoints'))
             if self.full_contribution:
                 data[:,:,:] = self.ddw_tdep[:,:,:]
-               
+
+        
+            # Contribution from Fan/DW, occ/unocc
+            data = dts.createVariable('reduced_fan_occ','d', ('number_of_spins','number_of_reduced_kpoints','number_of_bands','number_of_temperatures'))
+            data.units = "Hartree"
+            if self.reduce_path and self.split_occupied_subspace:
+                data[:,:,:,:] = self.reduced_fan_occ[:,:,:,:]
+
+            data = dts.createVariable('reduced_fan_unocc','d', ('number_of_spins','number_of_reduced_kpoints','number_of_bands','number_of_temperatures'))
+            data.units = "Hartree"
+            if self.reduce_path and self.split_occupied_subspace:
+                data[:,:,:,:] = self.reduced_fan_unocc[:,:,:,:]
+
+            data = dts.createVariable('reduced_ddw_occ','d', ('number_of_spins','number_of_reduced_kpoints','number_of_bands','number_of_temperatures'))
+            data.units = "Hartree"
+            if self.reduce_path and self.split_occupied_subspace:
+                data[:,:,:,:] = self.reduced_ddw_occ[:,:,:,:]
+
+            data = dts.createVariable('reduced_ddw_unocc','d', ('number_of_spins','number_of_reduced_kpoints','number_of_bands','number_of_temperatures'))
+            data.units = "Hartree"
+            if self.reduce_path and self.split_occupied_subspace:
+                data[:,:,:,:] = self.reduced_ddw_unocc[:,:,:,:]
+            
         return
 
     def write_gap_info(self):
@@ -1604,6 +1650,7 @@ def compute(
         indirect = False,
         modes=False,
         split_contribution = False,
+        split_occupied_subspace = False,
 
         **kwargs):
 
@@ -1626,6 +1673,7 @@ def compute(
             modes = modes,
             full_contribution = full_contribution,
             split_contribution = split_contribution,
+            split_occupied_subspace = split_occupied_subspace,
 
             valence = valence,
             nsppol = nsppol,

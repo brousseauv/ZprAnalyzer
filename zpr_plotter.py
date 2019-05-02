@@ -163,6 +163,12 @@ class ZPRfile(CDFfile):
             self.indirect_gap_energy_band_split = ncdata.variables['indirect_gap_energy_band_split'][:,:,:]
             self.indirect_gap_ren_band_split = ncdata.variables['indirect_gap_renormalization_band_split'][:,:,:]
 
+            self.fan_occ = ncdata.variables['reduced_fan_occ'][:,:,:,:]
+            self.fan_unocc = ncdata.variables['reduced_fan_unocc'][:,:,:,:]
+            self.ddw_occ = ncdata.variables['reduced_ddw_occ'][:,:,:,:]
+            self.ddw_unocc = ncdata.variables['reduced_ddw_unocc'][:,:,:,:]
+
+
             ### Only for split contribution, VB and CB / modes separate ###
 
 #            self.fan_g2 = ncdata.variables['reduced_fan_g2'][:,:,:,:,:,:,:] # spin kpt 2 2 mode qpt cplex
@@ -282,6 +288,7 @@ class ZPR_plotter(object):
     indirect = False
     unpert = False
     split_contribution = False
+    split_occupied_subspace = False
     modes = False
     verbose = False
     zero_gap_value = None
@@ -343,6 +350,7 @@ class ZPR_plotter(object):
             indirect = False,
             unpert = False,
             split_contribution = False,
+            split_occupied_subspace = False,
             modes = False,
             degen = None,
             verbose = False,
@@ -432,6 +440,7 @@ class ZPR_plotter(object):
         self.indirect = indirect
         self.unpert = unpert
         self.split_contribution = split_contribution
+        self.split_occupied_subspace = split_occupied_subspace
         self.modes = modes
 
         # Check if input is correct 
@@ -3063,6 +3072,354 @@ class ZPR_plotter(object):
         else:
             self.save_figure(fig)
 
+    def plot_splitted_subspaces(self):
+
+        file_qty = len(self.zpr_fnames)
+
+        # Define figure
+        fig, _arr = plt.subplots(3,1, figsize=self.figsize, squeeze=False, sharex=True)
+        plt.subplots_adjust(hspace=0.05, top=0.95) 
+
+        if self.split:
+            raise Exception('Not implemented for split yet.')
+#        if self.split:
+#            fig2, _arr2 = plt.subplots(3,1, figsize=self.figsize, squeeze=False, sharex=True)
+#            plt.subplots_adjust(hspace=0.05, top=0.95) 
+
+        if not self.band_numbers:
+            raise Exception('Must provide valence and conduction band numbers vis band_numbers')
+
+        # Read and treat all input files
+        for ifile, zpr_file in enumerate(self.zpr_fnames):
+                
+            # Define file class
+            self.zpr = ZPRfile(zpr_file, read=False)
+
+            # Read input file
+            self.read_file()
+
+            # Set parameters for this file
+            self.nsppol = self.zpr.nsppol
+            self.nkpt = self.zpr.nkpt
+            self.max_band = self.zpr.max_band
+            self.ntemp = self.zpr.ntemp
+            self.temp = self.zpr.temp
+            self.kpoints = self.zpr.kpoints
+            
+#            self.gridsize = self.zpr.gridsize
+            self.gap_units = self.zpr.gap_energy_units
+
+            if self.units == 'eV':
+                self.eig0 = self.zpr.eig0*cst.ha_to_ev
+                self.eigcorr = self.zpr.eigcorr*cst.ha_to_ev
+            if self.units == 'meV':
+                self.eig0 = self.zpr.eig0*cst.ha_to_ev*1000
+                self.eigcorr = self.zpr.eigcorr*cst.ha_to_ev*1000
+               
+#            # Set side of phase transition for split2 option
+#            if self.split2:
+#                if self.pressure[ifile] < self.crit_pressure:
+#                    side=0
+#                else:
+#                    side=1
+
+            # Retrieve data from file
+#            if self.split:
+#                self.loc0 = self.zpr.unperturbed_indirect_gap_location_split
+##                self.gap_location = self.zpr.gap_location_split
+#                self.gap_ren = self.zpr.indirect_gap_ren_split
+#                self.band_ren = self.zpr.indirect_gap_ren_band_split
+#
+#                gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
+#                for a in range(2):
+#                    gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
+#                    gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
+#
+#            if self.split2:
+#                self.loc0 = self.zpr.unperturbed_indirect_gap_location_split
+##                self.gap_location = self.zpr.indirect_gap_location_split
+#                self.gap_ren = self.zpr.indirect_gap_ren_split
+#                self.band_ren = self.zpr.indirect_gap_ren_band_split # T left/right vb/cb
+#
+#                gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
+#                for a in range(2):
+#                    gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
+#                    gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
+
+ 
+#            else:
+            self.loc0 = self.zpr.unperturbed_indirect_gap_location
+            self.loc = self.zpr.indirect_gap_location
+
+            self.gap_ren = self.zpr.indirect_gap_ren
+            self.band_ren = self.zpr.indirect_gap_ren_band
+            gap_index0 = np.zeros((2),dtype=int)
+            gap_index = np.zeros((self.ntemp,2),dtype=int)
+            for a in range(2):
+                gap_index0[a] = self.find_gap_index(self.loc0[a])
+                
+                for t in range(self.ntemp):
+                    gap_index[t,a] = self.find_gap_index(self.loc[t,a])
+
+
+            # Initialize plotting arrays
+            if ifile==0:
+#                if self.split: # distinct data for left and rifht gap
+#                    self.full_gap_ren = np.zeros((file_qty, self.ntemp,2))
+#                    self.full_band_ren = np.zeros((file_qty,self.ntemp,2,2)) # file, temp, vbcb, lr 
+#                    self.ref_temp = self.temp
+#                if self.split2: # single array, left gap for trovoal phase and right gap for topol phase
+#                    self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+#                    self.full_band_ren = np.zeros((file_qty,self.ntemp,2))
+#                    self.ref_temp = self.temp
+#                else:
+                self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+                self.full_band_ren = np.zeros((file_qty,self.ntemp,2))
+                self.ref_temp = self.temp
+                self.fan_occ = np.zeros((file_qty,self.ntemp,2))
+                self.fan_unocc = np.zeros((file_qty,self.ntemp,2))
+                self.ddw_occ = np.zeros((file_qty,self.ntemp,2))
+                self.ddw_unocc = np.zeros((file_qty,self.ntemp,2))
+
+            else:
+                if np.array_equal(self.temp,self.ref_temp) == False:
+                    raise Exception('All files must have the same temperature array! Please correct file #{}.'.format(ifile+1))
+
+            if self.ntemp > len(self.color):
+                raise Exception('Color vector is not long enough! Please provide {} color list.'.format(self.ntemp))
+
+#            if self.split:
+#                self.full_gap_ren[ifile,:,:] = self.gap_ren
+#     #           print(np.shape(self.gap_ren))
+#     #           print(np.shape(self.full_gap_ren))
+#            if self.split2:
+#                self.full_gap_ren[ifile,:] = self.gap_ren[:,side]
+#            else:
+            self.full_gap_ren[ifile,:] = self.gap_ren
+
+            for T in range(self.ntemp):
+                if self.unpert: ### FIX ME : WHAT DOES THIS DO???? This looks like the renorm(T) at the bare gap location...
+                    if self.split:
+                        for a in range(2):
+                            self.full_band_ren[ifile, T,0,a] = self.eigcorr[0,gap_index0[0,a],self.band_numbers[0]-1,T]-self.eig0[0,gap_index0[0,a],self.band_numbers[0]-1] 
+                            self.full_band_ren[ifile, T,1,a] = self.eigcorr[0,gap_index0[1,a],self.band_numbers[1]-1,T]-self.eig0[0,gap_index0[1,a],self.band_numbers[1]-1]
+                    if self.split2:
+                            self.full_band_ren[ifile, T,0] = self.eigcorr[0,gap_index0[0,0],self.band_numbers[0]-1,T]-self.eig0[0,gap_index0[0,0],self.band_numbers[0]-1] 
+                            self.full_band_ren[ifile, T,1] = self.eigcorr[0,gap_index0[1,0],self.band_numbers[1]-1,T]-self.eig0[0,gap_index0[1,0],self.band_numbers[1]-1]
+
+                    else:
+                            self.full_band_ren[ifile, T,0] = self.eigcorr[0,gap_index0[0],self.band_numbers[0]-1,T]-self.eig0[0,gap_index0[0],self.band_numbers[0]-1] 
+                            self.full_band_ren[ifile, T,1] = self.eigcorr[0,gap_index0[1],self.band_numbers[1]-1,T]-self.eig0[0,gap_index0[1],self.band_numbers[1]-1]
+
+                else:
+#                    if self.split:
+#                        for a in range(2):
+#                            self.full_band_ren[ifile, T,0,a] = self.band_ren[T,a,0]  
+#                            self.full_band_ren[ifile, T,1,a] = self.band_ren[T,a,1]
+#
+#                            diff = (self.full_band_ren[ifile,T,1,a]-self.full_band_ren[ifile,T,0,a]) - self.full_gap_ren[ifile,T,a]
+#    #                        if abs(diff)>1E-6:
+#    #                            print(ifile,T,a)
+#    #                            print(self.full_gap_ren[ifile,T,a],self.full_band_ren[ifile,T,0,a],self.full_band_ren[ifile,T,1,a],self.full_band_ren[ifile,T,1,a]-self.full_band_ren[ifile,T,0,a])
+#    #                            print(self.gap_location[T,a], self.kpoints[gap_index])
+#                    if self.split2:
+#                        self.full_band_ren[ifile, T, :] = self.band_ren[T,side,:]
+#                    else:
+                    for a in range(2): 
+                        self.full_band_ren[ifile, T,a] = self.band_ren[T,a]
+                        self.fan_occ[ifile,T,a] = self.zpr.fan_occ[0,gap_index[T,a],self.band_numbers[a]-1,T]*cst.ha_to_ev*1000
+                        self.fan_unocc[ifile,T,a] = self.zpr.fan_unocc[0,gap_index[T,a],self.band_numbers[a]-1,T]*cst.ha_to_ev*1000
+                        self.ddw_occ[ifile,T,a] = self.zpr.ddw_occ[0,gap_index[T,a],self.band_numbers[a]-1,T]*cst.ha_to_ev*1000
+                        self.ddw_unocc[ifile,T,a] = self.zpr.ddw_unocc[0,gap_index[T,a],self.band_numbers[a]-1,T]*cst.ha_to_ev*1000
+
+                    diff = (self.full_band_ren[ifile,T,1]-self.full_band_ren[ifile,T,0]) - self.full_gap_ren[ifile,T]
+#                    if abs(diff)>1E-6:
+    #                        print(ifile,T)
+    #                        print(self.full_gap_ren[ifile,T],self.full_band_ren[ifile,T,0],self.full_band_ren[ifile,T,1],self.full_band_ren[ifile,T,1]-self.full_band_ren[ifile,T,0])
+    #                        print(self.gap_location[T], self.kpoints[gap_index])
+
+    #                print(ifile, T, gap_index)
+
+            if self.verbose:
+
+                print('Valence band')
+                print(self.fan_occ[ifile,:,0])
+                print(self.fan_unocc[ifile,:,0])
+                print(self.ddw_occ[ifile,:,0])
+                print(self.ddw_unocc[ifile,:,0])
+
+                print('full band ren : {}'.format(self.full_band_ren[ifile,:,0]))
+                print('sum : {}'.format(self.fan_occ[ifile,:,0]+self.fan_unocc[ifile,:,0]+self.ddw_occ[ifile,:,0]+self.ddw_unocc[ifile,:,0]))
+                print('Conduction band')
+                print(self.fan_occ[ifile,:,1])
+                print(self.fan_unocc[ifile,:,1])
+                print(self.ddw_occ[ifile,:,1])
+                print(self.ddw_unocc[ifile,:,1])
+
+
+                print('full band ren : {}'.format(self.full_band_ren[ifile,:,1]))
+                print('sum : {}'.format(self.fan_occ[ifile,:,1]+self.fan_unocc[ifile,:,1]+self.ddw_occ[ifile,:,1]+self.ddw_unocc[ifile,:,1]))
+
+        if self.crit_pressure is not None:
+            crit_index = self.find_crit_index()
+        else:
+            crit_index = None
+#        print(crit_index)
+
+        temp_index = self.find_temp_index()
+        print(temp_index)
+#        for T in range(self.ntemp):
+        for T in [temp_index]:
+
+            if crit_index is not None:
+                s = crit_index+1
+
+#                if self.split:
+#                    #figure1
+#                    _arr[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1,0], marker='o', markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#                    _arr[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0,0], marker='o', markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#
+#                    _arr[2][0].legend(numpoints = 1, loc = 'center right', bbox_to_anchor=(1.27,1.62), ncol = 1, fontsize=20)
+#
+#                  #  self.set_legend_pgap2(_arr[2][0])
+#                    _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1,0], marker='o', markersize=8, linewidth=2.0, color=self.color[T])
+#                    _arr[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0,0], marker='o', markersize=8, linewidth=2.0, color=self.color[T])
+#                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,0], marker='o', markersize=8, linewidth=2.0, color=self.color[T])
+#
+#                    #figure2
+#                    _arr2[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1,1], marker='o', markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#                    _arr2[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0,1], marker='o', markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#                    _arr2[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T,1], marker='o', markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#
+#                    self.set_legend_pgap2(_arr2[2][0])
+#                    _arr2[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1,1], marker='o', markersize=8, linewidth=2.0, color=self.color[T])
+#                    _arr2[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0,1], marker='o', markersize=8, linewidth=2.0, color=self.color[T])
+#                    _arr2[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,1], marker='o', markersize=8, linewidth=2.0, color=self.color[T])
+#
+#                else:
+                _arr[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+
+
+                _arr[0][0].plot(self.pressure[0:s], self.fan_occ[0:s,T,1], marker='o', markersize=8, linewidth=2.0, color='red', label='Fan occ')
+                _arr[1][0].plot(self.pressure[0:s], self.fan_occ[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='red', label='Fan occ')
+                _arr[2][0].plot(self.pressure[0:s], self.fan_occ[0:s,T,1]-self.fan_occ[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='red', label='Fan occ')
+
+                _arr[0][0].plot(self.pressure[0:s], self.fan_unocc[0:s,T,1], marker='o', markersize=8, linewidth=2.0, color='blue', label='Fan unocc')
+                _arr[1][0].plot(self.pressure[0:s], self.fan_unocc[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='blue', label='Fan unocc')
+                _arr[2][0].plot(self.pressure[0:s], self.fan_unocc[0:s,T,1]-self.fan_unocc[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='blue', label='Fan unocc')
+
+                _arr[0][0].plot(self.pressure[0:s], self.ddw_occ[0:s,T,1], marker='o', markersize=8, linewidth=2.0, color='green', label='DW occ')
+                _arr[1][0].plot(self.pressure[0:s], self.ddw_occ[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='green', label='DW occ')
+                _arr[2][0].plot(self.pressure[0:s], self.ddw_occ[0:s,T,1]-self.ddw_occ[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='green', label='DW occ')
+
+                _arr[0][0].plot(self.pressure[0:s], self.ddw_unocc[0:s,T,1], marker='o', markersize=8, linewidth=2.0, color='orange', label='DW unocc')
+                _arr[1][0].plot(self.pressure[0:s], self.ddw_unocc[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='orange', label='DW unocc')
+                _arr[2][0].plot(self.pressure[0:s], self.ddw_unocc[0:s,T,1]-self.ddw_unocc[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='orange', label='DW unocc')
+
+
+
+                _arr[2][0].legend(numpoints=1, loc= 'center right', bbox_to_anchor=(1.27,1.62), ncol=1, fontsize=20)
+
+                    ### After Pc
+
+                _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+
+
+                _arr[0][0].plot(self.pressure[s:], self.fan_occ[s:,T,1], marker='o', markersize=8, linewidth=2.0, color='red', label='Fan occ')
+                _arr[1][0].plot(self.pressure[s:], self.fan_occ[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='red', label='Fan occ')
+                _arr[2][0].plot(self.pressure[s:], self.fan_occ[s:,T,1]-self.fan_occ[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='red', label='Fan occ')
+
+                _arr[0][0].plot(self.pressure[s:], self.fan_unocc[s:,T,1], marker='o', markersize=8, linewidth=2.0, color='blue', label='Fan unocc')
+                _arr[1][0].plot(self.pressure[s:], self.fan_unocc[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='blue', label='Fan unocc')
+                _arr[2][0].plot(self.pressure[s:], self.fan_unocc[s:,T,1]-self.fan_unocc[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='blue', label='Fan unocc')
+
+                _arr[0][0].plot(self.pressure[s:], self.ddw_occ[s:,T,1], marker='o', markersize=8, linewidth=2.0, color='green', label='DW occ')
+                _arr[1][0].plot(self.pressure[s:], self.ddw_occ[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='green', label='DW occ')
+                _arr[2][0].plot(self.pressure[s:], self.ddw_occ[s:,T,1]-self.ddw_occ[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='green', label='DW occ')
+
+                _arr[0][0].plot(self.pressure[s:], self.ddw_unocc[s:,T,1], marker='o', markersize=8, linewidth=2.0, color='orange', label='DW unocc')
+                _arr[1][0].plot(self.pressure[s:], self.ddw_unocc[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='orange', label='DW unocc')
+                _arr[2][0].plot(self.pressure[s:], self.ddw_unocc[s:,T,1]-self.ddw_unocc[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='orange', label='DW unocc')
+
+
+            else:
+                if self.split:
+                    _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+                    _arr[1][0].legend(numpoints = 1, loc = 'center right', bbox_to_anchor=(1.02,1.0), ncol = 1, fontsize=26)
+
+
+#                    _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#                    _arr[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+
+                else:
+                    _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+
+
+#        limms = [[-50.,50.],[-2.,50.],[-90.,40.]]
+###########FIX ME : add default data and if condition
+#        limms = [self.cond_ylims, self.val_ylims, self.gap_ylims]
+#        for i in range(3):
+##            lims = _arr[i,0].get_ylim() 
+#            ylims = limms[i]    
+#            self.set_vrefs(_arr[i][0], self.pressure, 0.)
+#            self.set_hrefs(ylims, _arr[i][0], self.crit_pressure,'black')
+#            self.set_hrefs(ylims, _arr[i][0], self.crit_pressure+0.2,'black')
+#            _arr[i][0].fill([2.08,2.28,2.28,2.08],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+#            _arr[i,0].set_ylim(limms[i])
+#
+#
+#            if self.split:
+#                self.set_vrefs(_arr2[i][0], self.pressure, 0.)
+#                self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure,'black')
+#                self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure+0.2,'black')
+#                lims = _arr[i,0].get_ylim() 
+#                _arr2[i][0].fill([2.08,2.28,2.28,2.08],[lims[0]-5,lims[0]-5,lims[1]+5,lims[1]+5],'gray',alpha=0.2)
+
+
+        
+        self.set_xaxis(_arr[2][0], self.pressure)
+        self.set_yaxis(_arr[0][0], 'CB ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr[1][0], 'VB ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr[2][0], 'Gap ren ({})'.format(self.gap_units))
+
+        fig.subplots_adjust(left=0.11,bottom=0.08,right=0.81,top=0.95,wspace=0.2,hspace=0.12)
+
+        #_arr[1,0].text(self.explicit_pressures[8],300, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=30)
+        #_arr[1,0].text(self.explicit_pressures[35],300, r'$\frac{k_z c}{2\pi} = 0.5349$',fontsize=30)
+
+        #_arr[1,0].text(self.explicit_pressures[12],250, r'WSM 0K', fontsize=28, weight='bold', color='gray')
+
+
+
+        if self.split:
+            self.set_xaxis(_arr2[2][0], self.pressure)
+            self.set_yaxis(_arr2[0][0], 'CB ren ({})'.format(self.gap_units))
+            self.set_yaxis(_arr2[1][0], 'VB ren ({})'.format(self.gap_units))
+            self.set_yaxis(_arr2[2][0], 'Gap ren ({})'.format(self.gap_units))
+
+            self.set_title(_arr[0][0], self.title[0])
+            self.set_title(_arr2[0][0], self.title[1])
+
+        else:
+            self.set_title(_arr[0][0], self.main_title)
+
+        plt.show()
+        if self.split:
+            self.save_figure_split(fig,fig2)
+        else:
+            self.save_figure(fig)
+
+
     def plot_split_contribution(self):
         # Plot total contribution to TDR, splitted into VB and CB contributions. Can also be used with individual modes.
         file_qty = len(self.zpr_fnames)
@@ -3600,7 +3957,7 @@ class ZPR_plotter(object):
 
         lst = list(self.temp) 
 
-        if self.vbcb:
+        if self.vbcb or self.split_occupied_subspace:
             if self.temp_to_print in lst:
                 return lst.index(self.temp_to_print)
             else:
@@ -3619,6 +3976,17 @@ class ZPR_plotter(object):
                     if self.pressure[i]<self.crit_pressure and self.crit_pressure < self.pressure[i+1]:
                         return i
                 return None
+
+    def find_crit_index(self):
+
+        lst = list(self.pressure)
+        if self.crit_pressure in lst:
+            return lst.index(self.crit_pressure)
+        else:
+            for i in range(len(self.pressure)-1):
+                if self.pressure[i]<self.crit_pressure and self.crit_pressure < self.pressure[i+1]:
+                    return i
+            return None
 
     def find_temp_index2(self, pressure):
 
@@ -3940,6 +4308,7 @@ def plotter(
         indirect = False,
         unpert = False,
         split_contribution = False,
+        split_occupied_subspace = False,
         modes = False,
         verbose = False,
         zero_gap_value = None,
@@ -4011,6 +4380,7 @@ def plotter(
             indirect = indirect,
             unpert = unpert,
             split_contribution = split_contribution,
+            split_occupied_subspace = split_occupied_subspace,
             modes = modes,
             verbose = verbose,
 
@@ -4061,6 +4431,10 @@ def plotter(
                     zpr_plot.plot_pgap_separate()
                 else:
                     zpr_plot.plot_pgap()
+
+        if split_occupied_subspace:
+            print('plot')
+            zpr_plot.plot_splitted_subspaces()
 
         
 
