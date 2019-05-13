@@ -3078,6 +3078,9 @@ class ZPR_plotter(object):
 
         # Define figure
         fig, _arr = plt.subplots(3,1, figsize=self.figsize, squeeze=False, sharex=True)
+        fig2, _arr2 = plt.subplots(3,1, figsize=self.figsize, squeeze=False, sharex=True)
+        fig3, _arr3 = plt.subplots(3,1, figsize=self.figsize, squeeze=False, sharex=True)
+
         plt.subplots_adjust(hspace=0.05, top=0.95) 
 
         if self.split:
@@ -3268,6 +3271,38 @@ class ZPR_plotter(object):
 
         temp_index = self.find_temp_index()
         print(temp_index)
+
+        # Print pressure-dependent results, for chosen temperature
+        print('Valence band')
+        print('    Fan occ {}'.format(self.fan_occ[:,temp_index,0]))
+        print('    Fan unocc {}'.format(self.fan_unocc[:,temp_index,0]))
+        print('    DW occ {}'.format(self.ddw_occ[:,temp_index,0]))
+        print('    DW unocc {}'.format(self.ddw_unocc[:,temp_index,0]))
+
+        print('\n    Fan total {}'.format(self.fan_occ[:,temp_index,0],self.fan_unocc[:,temp_index,0]))
+        print('    DW total {}'.format(self.ddw_occ[:,temp_index,0],self.ddw_unocc[:,temp_index,0]))
+        print('\n    Occ total {}'.format(self.fan_occ[:,temp_index,0],self.ddw_occ[:,temp_index,0]))
+        print('    Unocc total {}'.format(self.fan_unocc[:,temp_index,0],self.ddw_unocc[:,temp_index,0]))
+
+
+        print('full band ren : {}'.format(self.full_band_ren[:,temp_index,0]))
+        print('sum : {}'.format(self.fan_occ[:,temp_index,0]+self.fan_unocc[:,temp_index,0]+self.ddw_occ[:,temp_index,0]+self.ddw_unocc[:,temp_index,0]))
+        print('\n\nConduction band')
+        print('    Fan occ {}'.format(self.fan_occ[:,temp_index,1]))
+        print('    Fan unocc {}'.format(self.fan_unocc[:,temp_index,1]))
+        print('    DW occ {}'.format(self.ddw_occ[:,temp_index,1]))
+        print('    DW unocc {}'.format(self.ddw_unocc[:,temp_index,1]))
+
+        print('\n    Fan total {}'.format(self.fan_occ[:,temp_index,1],self.fan_unocc[:,temp_index,1]))
+        print('    DW total {}'.format(self.ddw_occ[:,temp_index,1],self.ddw_unocc[:,temp_index,1]))
+        print('\n    Occ total {}'.format(self.fan_occ[:,temp_index,1],self.ddw_occ[:,temp_index,1]))
+        print('    Unocc total {}'.format(self.fan_unocc[:,temp_index,1],self.ddw_unocc[:,temp_index,1]))
+
+        print('\n\nfull band ren : {}'.format(self.full_band_ren[:,temp_index,1]))
+        print('sum : {}'.format(self.fan_occ[:,temp_index,1]+self.fan_unocc[:,temp_index,1]+self.ddw_occ[:,temp_index,1]+self.ddw_unocc[:,temp_index,1]))
+
+
+ 
 #        for T in range(self.ntemp):
         for T in [temp_index]:
 
@@ -3323,6 +3358,39 @@ class ZPR_plotter(object):
 
                 _arr[2][0].legend(numpoints=1, loc= 'center right', bbox_to_anchor=(1.27,1.62), ncol=1, fontsize=20)
 
+                # Fig 2 : Fan and DW total
+                _arr2[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr2[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr2[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+
+                _arr2[0][0].plot(self.pressure[0:s], self.fan_occ[0:s,T,1]+self.fan_unocc[0:s,T,1] , marker='o', markersize=8, linewidth=2.0, color='red', label='Fan')
+                _arr2[1][0].plot(self.pressure[0:s], self.fan_occ[0:s,T,0]+self.fan_unocc[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='red', label='Fan')
+                _arr2[2][0].plot(self.pressure[0:s], self.fan_occ[0:s,T,1]+self.fan_unocc[0:s,T,1]-(self.fan_occ[0:s,T,0]+self.fan_unocc[0:s,T,0]), marker='o', markersize=8, linewidth=2.0, color='red', label='Fan')
+
+                _arr2[0][0].plot(self.pressure[0:s], self.ddw_occ[0:s,T,1]+self.ddw_unocc[0:s,T,1], marker='o', markersize=8, linewidth=2.0, color='blue', label='DW')
+                _arr2[1][0].plot(self.pressure[0:s], self.ddw_occ[0:s,T,0]+self.ddw_unocc[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='blue', label='DW')
+                _arr2[2][0].plot(self.pressure[0:s], self.ddw_occ[0:s,T,1]+self.ddw_unocc[0:s,T,1]-(self.ddw_occ[0:s,T,0]+self.ddw_unocc[0:s,T,0]), marker='o', markersize=8, linewidth=2.0, color='blue', label='DW')
+
+                _arr2[2][0].legend(numpoints=1, loc= 'center right', bbox_to_anchor=(1.17,1.62), ncol=1, fontsize=20)
+
+                # Fig 3 : Total contribution from occupied/unoccupied bands
+                _arr3[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr3[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr3[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+
+                _arr3[0][0].plot(self.pressure[0:s], self.fan_occ[0:s,T,1]+self.ddw_occ[0:s,T,1] , marker='o', markersize=8, linewidth=2.0, color='red', label='occ')
+                _arr3[1][0].plot(self.pressure[0:s], self.fan_occ[0:s,T,0]+self.ddw_occ[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='red', label='occ')
+                _arr3[2][0].plot(self.pressure[0:s], self.fan_occ[0:s,T,1]+self.ddw_occ[0:s,T,1]-(self.fan_occ[0:s,T,0]+self.ddw_occ[0:s,T,0]), marker='o', markersize=8, linewidth=2.0, color='red', label='occ')
+
+                _arr3[0][0].plot(self.pressure[0:s], self.fan_unocc[0:s,T,1]+self.ddw_unocc[0:s,T,1], marker='o', markersize=8, linewidth=2.0, color='blue', label='unocc')
+                _arr3[1][0].plot(self.pressure[0:s], self.fan_unocc[0:s,T,0]+self.ddw_unocc[0:s,T,0], marker='o', markersize=8, linewidth=2.0, color='blue', label='unocc')
+                _arr3[2][0].plot(self.pressure[0:s], self.fan_unocc[0:s,T,1]+self.ddw_unocc[0:s,T,1]-(self.fan_unocc[0:s,T,0]+self.ddw_unocc[0:s,T,0]), marker='o', markersize=8, linewidth=2.0, color='blue', label='unocc')
+
+                _arr3[2][0].legend(numpoints=1, loc= 'center right', bbox_to_anchor=(1.17,1.62), ncol=1, fontsize=20)
+
+
+            ####################################
+            ####################################
                     ### After Pc
 
                 _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
@@ -3347,6 +3415,32 @@ class ZPR_plotter(object):
                 _arr[2][0].plot(self.pressure[s:], self.ddw_unocc[s:,T,1]-self.ddw_unocc[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='orange', label='DW unocc')
 
 
+                # Fan and DW total
+                _arr2[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr2[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr2[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+
+                _arr2[0][0].plot(self.pressure[s:], self.fan_occ[s:,T,1]+self.fan_unocc[s:,T,1] , marker='o', markersize=8, linewidth=2.0, color='red', label='Fan')
+                _arr2[1][0].plot(self.pressure[s:], self.fan_occ[s:,T,0]+self.fan_unocc[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='red', label='Fan')
+                _arr2[2][0].plot(self.pressure[s:], self.fan_occ[s:,T,1]+self.fan_unocc[s:,T,1]-(self.fan_occ[s:,T,0]+self.fan_unocc[s:,T,0]), marker='o', markersize=8, linewidth=2.0, color='red', label='Fan')
+
+                _arr2[0][0].plot(self.pressure[s:], self.ddw_occ[s:,T,1]+self.ddw_unocc[s:,T,1], marker='o', markersize=8, linewidth=2.0, color='blue', label='DW')
+                _arr2[1][0].plot(self.pressure[s:], self.ddw_occ[s:,T,0]+self.ddw_unocc[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='blue', label='DW')
+                _arr2[2][0].plot(self.pressure[s:], self.ddw_occ[s:,T,1]+self.ddw_unocc[s:,T,1]-(self.ddw_occ[s:,T,0]+self.ddw_unocc[s:,T,0]), marker='o', markersize=8, linewidth=2.0, color='blue', label='DW')
+
+                # Fig 3 : Total contribution from occupied/unoccupied bands
+                _arr3[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr3[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+                _arr3[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=8, linewidth=2.0, color='black', label='Full')
+
+                _arr3[0][0].plot(self.pressure[s:], self.fan_occ[s:,T,1]+self.ddw_occ[s:,T,1] , marker='o', markersize=8, linewidth=2.0, color='red', label='occ')
+                _arr3[1][0].plot(self.pressure[s:], self.fan_occ[s:,T,0]+self.ddw_occ[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='red', label='occ')
+                _arr3[2][0].plot(self.pressure[s:], self.fan_occ[s:,T,1]+self.ddw_occ[s:,T,1]-(self.fan_occ[s:,T,0]+self.ddw_occ[s:,T,0]), marker='o', markersize=8, linewidth=2.0, color='red', label='occ')
+
+                _arr3[0][0].plot(self.pressure[s:], self.fan_unocc[s:,T,1]+self.ddw_unocc[s:,T,1], marker='o', markersize=8, linewidth=2.0, color='blue', label='unocc')
+                _arr3[1][0].plot(self.pressure[s:], self.fan_unocc[s:,T,0]+self.ddw_unocc[s:,T,0], marker='o', markersize=8, linewidth=2.0, color='blue', label='unocc')
+                _arr3[2][0].plot(self.pressure[s:], self.fan_unocc[s:,T,1]+self.ddw_unocc[s:,T,1]-(self.fan_unocc[s:,T,0]+self.ddw_unocc[s:,T,0]), marker='o', markersize=8, linewidth=2.0, color='blue', label='unocc')
+
             else:
                 if self.split:
                     _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
@@ -3365,19 +3459,26 @@ class ZPR_plotter(object):
                     _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
 
 
+        # set vrefs at 0
+        for i in range(3):
+            self.set_vrefs(_arr[i][0], self.pressure, 0.)
+            self.set_vrefs(_arr2[i][0], self.pressure, 0.)
+            self.set_vrefs(_arr3[i][0], self.pressure, 0.)
+
 #        limms = [[-50.,50.],[-2.,50.],[-90.,40.]]
-###########FIX ME : add default data and if condition
-#        limms = [self.cond_ylims, self.val_ylims, self.gap_ylims]
-#        for i in range(3):
-##            lims = _arr[i,0].get_ylim() 
-#            ylims = limms[i]    
-#            self.set_vrefs(_arr[i][0], self.pressure, 0.)
-#            self.set_hrefs(ylims, _arr[i][0], self.crit_pressure,'black')
-#            self.set_hrefs(ylims, _arr[i][0], self.crit_pressure+0.2,'black')
-#            _arr[i][0].fill([2.08,2.28,2.28,2.08],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
-#            _arr[i,0].set_ylim(limms[i])
-#
-#
+##########FIX ME : add default data and if condition
+        if self.cond_ylims and self.val_ylims:
+            if self.gap_ylims:
+                limms = [self.cond_ylims, self.val_ylims, self.gap_ylims]
+                for i in range(3):
+                    lims = _arr[i,0].get_ylim() 
+                    ylims = limms[i]    
+                    self.set_hrefs(ylims, _arr[i][0], self.crit_pressure,'black')
+                    self.set_hrefs(ylims, _arr[i][0], self.crit_pressure+0.2,'black')
+                    _arr[i][0].fill([2.08,2.28,2.28,2.08],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+                    _arr[i,0].set_ylim(limms[i])
+
+
 #            if self.split:
 #                self.set_vrefs(_arr2[i][0], self.pressure, 0.)
 #                self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure,'black')
@@ -3391,6 +3492,16 @@ class ZPR_plotter(object):
         self.set_yaxis(_arr[0][0], 'CB ren ({})'.format(self.gap_units))
         self.set_yaxis(_arr[1][0], 'VB ren ({})'.format(self.gap_units))
         self.set_yaxis(_arr[2][0], 'Gap ren ({})'.format(self.gap_units))
+
+        self.set_xaxis(_arr2[2][0], self.pressure)
+        self.set_yaxis(_arr2[0][0], 'CB ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr2[1][0], 'VB ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr2[2][0], 'Gap ren ({})'.format(self.gap_units))
+
+        self.set_xaxis(_arr3[2][0], self.pressure)
+        self.set_yaxis(_arr3[0][0], 'CB ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr3[1][0], 'VB ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr3[2][0], 'Gap ren ({})'.format(self.gap_units))
 
         fig.subplots_adjust(left=0.11,bottom=0.08,right=0.81,top=0.95,wspace=0.2,hspace=0.12)
 
@@ -3411,14 +3522,16 @@ class ZPR_plotter(object):
             self.set_title(_arr2[0][0], self.title[1])
 
         else:
-            self.set_title(_arr[0][0], self.main_title)
+            if self.main_title:
+                self.set_title(_arr[0][0], self.main_title)
 
-        plt.show()
+
         if self.split:
             self.save_figure_split(fig,fig2)
         else:
-            self.save_figure(fig)
+            self.save_figure_subspaces(fig,fig2,fig3)
 
+        plt.show()
 
     def plot_split_contribution(self):
         # Plot total contribution to TDR, splitted into VB and CB contributions. Can also be used with individual modes.
@@ -4051,7 +4164,7 @@ class ZPR_plotter(object):
                     for itick, tick in enumerate(f.xaxis.get_majorticklabels()):
                         tick.set_horizontalalignment(self.xticks_alignment[itick]) 
 
-        if self.pgap:
+        if self.pgap or self.split_occupied_subspace:
             lims = (min(self.pressure)-0.1, max(self.pressure)+0.1)
             f.set_xlim(lims)
             plt.setp(f.get_xticklabels(), fontsize=20, weight='bold')
@@ -4234,7 +4347,16 @@ class ZPR_plotter(object):
             g1.savefig('figures/{}_lgap.png'.format(self.savefile))
             g2.savefig('figures/{}_rgap.png'.format(self.savefile))
 
+    def save_figure_subspaces(self,g1,g2,g3):
 
+        create_directory('figures/')
+
+        if self.savefile:
+            g1.savefig('figures/{}.png'.format(self.savefile))
+            g2.savefig('figures/{}_Fan-DW.png'.format(self.savefile))
+            g3.savefig('figures/{}_occ-unocc.png'.format(self.savefile))
+
+    
 ##########################
 # Create a directory if it does not exist
 def create_directory(fname):
@@ -4433,7 +4555,6 @@ def plotter(
                     zpr_plot.plot_pgap()
 
         if split_occupied_subspace:
-            print('plot')
             zpr_plot.plot_splitted_subspaces()
 
         

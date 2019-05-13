@@ -897,6 +897,8 @@ class EigenvalueCorrections(object):
             ren = np.zeros((self.ntemp,2), dtype=float)
         
             # Define mid in kpt array
+            if not self.split_kpt:
+                raise Exception('split_kpt is not well-defined, as reduced_kpt_array cannot be splitted. Please check your input')
             kmid = self.get_param_index(self.reduced_kpath, self.split_kpt)
 #            kmid = int(self.reduced_nkpt/2.)+1
 
