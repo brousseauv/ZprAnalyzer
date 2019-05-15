@@ -3043,17 +3043,17 @@ class ZPR_plotter(object):
         for i in range(3):
 #            lims = _arr[i,0].get_ylim() 
             ylims = limms[i]    
-            self.set_vrefs(_arr[i][0], self.pressure, 0.)
-            self.set_hrefs(ylims, _arr[i][0], self.crit_pressure,'black')
-            self.set_hrefs(ylims, _arr[i][0], self.crit_pressure+0.2,'black')
+            self.set_vrefs(_arr[i][0], self.pressure, 0.,style='dashed')
+            self.set_hrefs(ylims, _arr[i][0], self.crit_pressure,'gray')
+            self.set_hrefs(ylims, _arr[i][0], self.crit_pressure+0.2,'gray')
             _arr[i][0].fill([2.08,2.28,2.28,2.08],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
             _arr[i,0].set_ylim(limms[i])
 
 
             if self.split:
                 self.set_vrefs(_arr2[i][0], self.pressure, 0.)
-                self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure,'black')
-                self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure+0.2,'black')
+                self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure,'gray')
+                self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure+0.2,'gray')
                 lims = _arr[i,0].get_ylim() 
                 _arr2[i][0].fill([2.08,2.28,2.28,2.08],[lims[0]-5,lims[0]-5,lims[1]+5,lims[1]+5],'gray',alpha=0.2)
 
@@ -3092,18 +3092,29 @@ class ZPR_plotter(object):
                 self.set_title(_arr0[0][0], self.main_title)
 
         # Custum stuff
-#        _ax1.text(self.pressure[12],125, r'$\mathbb{Z}_2=0$', fontsize=28,color='k')
-#        _ax1.text(self.pressure[30], 125, r'$\mathbb{Z}_2=1$',fontsize = 28,color='k')
-#        _ax1.text(self.pressure[24],160,r'$\Leftarrow$',fontsize=24,color='#5A5A5A')
-#        _ax1.text(self.pressure[27],160,r'WSM',fontsize=24,color='#5A5A5A',weight='bold')
+        _arr[2][0].text(0.7,-82, r'$\mathbb{Z}_2\!=\!0$', fontsize=24,color='k')
+        _arr[2][0].text(2.7, -82, r'$\mathbb{Z}_2\!=\!1$',fontsize = 24,color='k')
+        _arr[2][0].text(1.85,-60,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
+        _arr[2][0].text(1.35,-60,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
 
         legend_handles = [] 
         for t, temp in enumerate(self.ref_temp):
             legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
 #                Line2D([0],[0],color='b',marker='o',markersize=8,linestyle='None',label=r'P$_{\text{C2}}$ plane')]
-        legend1 = _arr[0][0].legend(handles=legend_handles, loc=1,bbox_to_anchor=(1.11,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = len(self.ref_temp),columnspacing=1)
+        #legend_handles.append('')
+        #legend_handles.append('')
+
+        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = len(self.ref_temp),columnspacing=1)
         _arr[0][0].add_artist(legend1)
         
+        legend2_handles=[]
+        legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
+        legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
+        legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1,borderpad=0.2)
+        _arr[0][0].add_artist(legend2)
+
+        fig.subplots_adjust(hspace=0.0,top=0.90,right=0.95)
+
         if self.split:
             fig.align_ylabels()
             fig2.align_ylabels()
@@ -4282,7 +4293,7 @@ class ZPR_plotter(object):
     def label_formatter(self,x, pos):
         return "%i" %x
 
-    def set_hrefs(self, lims, f, val,col):
+    def set_hrefs(self, lims, f, val,col,style='solid'):
 
         print(lims)
         if not lims:
@@ -4295,10 +4306,10 @@ class ZPR_plotter(object):
 #        if self.vbcb == True:
 #            f.plot(zer,y,'k:')
 #        else:
-        f.plot(zer,y,col)
+        f.plot(zer,y,color=col,linestyle=style)
 
 
-    def set_vrefs(self,f,x,val):
+    def set_vrefs(self,f,x,val,style='solid'):
 
         if self.pgap:
             lims = (min(self.pressure)-0.1, max(self.pressure)+0.1)
@@ -4311,7 +4322,7 @@ class ZPR_plotter(object):
     #        if self.vbcb==True:
     #            f.plot(x,zer,'k')
     #        else:
-        f.plot(x, zer, color='black', linestyle='solid')
+        f.plot(x, zer, color='black', linestyle=style)
 
 
     def set_legend_pgap(self,f):
