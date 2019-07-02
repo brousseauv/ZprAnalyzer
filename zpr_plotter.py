@@ -2008,7 +2008,7 @@ class ZPR_plotter(object):
 
 
                     if self.gap_fname is not None:
-                        print('line 1995, nothing done here')
+                        pass
                         #_arr[1][0].plot(self.explicit_pressures[s:], self.explicit_gap_energies[s:],marker='d', color='black')
                     else:
                         if only:
@@ -4468,21 +4468,58 @@ class ZPR_plotter(object):
 
     def plot_phase_diagram(self):
 
+        from mpl_toolkits.axes_grid1.inset_locator import inset_axes
         # Plot (P,T) phase diagram, from output of plot_pgap_indirect
         _fig, _arr = plt.subplots(1,1,figsize=self.figsize,squeeze=True)
 
         _arr.plot(self.pc1,self.ref_temp,marker='o',markersize=6,color='k')
         _arr.plot(self.pc2,self.ref_temp,marker='o',markersize=6,color='k')
         _arr.fill_betweenx(self.ref_temp,self.pc1,self.pc2,color='gray',alpha=0.2)
+#        _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#363256',alpha=0.6) #darkbluepurple
+        _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#6C70C8',alpha=0.6) #periwinkle
+        x = np.ones((len(self.ref_temp)))
+        _arr.plot(self.crit_pressure*x, self.ref_temp,'k:')
+        _arr.plot(self.crit_pressure2*x, self.ref_temp,'k:')
+        legend_handles = [Line2D([0],[0],color='k',linewidth=1,linestyle='dotted',label=r'Static')]
+        legend1 = _arr.legend(handles=legend_handles, loc=3,fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1)
 
-#        _arr.set_xlims(self.pressure[0],self.pressure[-1])
+
 
         self.set_xaxis(_arr, self.pressure)
+        _arr.set_xlim(self.pressure[0],self.pressure[-1])
         self.set_temp_yaxis(_arr, r'Temperature (K)',self.ref_temp)
+
+
+        _arr.text(0.8,400,r'$\mathbb{Z}_2=0$',fontsize=24)
+        _arr.text(3.7,400,r'$\mathbb{Z}_2=1$',fontsize=24)
+        _arr.text(2.3,400,r'WSM',fontsize=24,color='#5A5A5A')
+
+
+#        _inset = inset_axes(_arr, loc=2,width='30%', height='30%',borderpad=3)
+#        _inset.plot(self.ref_temp,self.pc2-self.pc1,'b')
 
 #        _arr.set_xlims(
 
         self.save_phase_diagram(_fig)
+
+        self.write_phase_diagram()
+
+    def write_phase_diagram(self):
+
+        outfile = 'phase_diagram.dat'
+
+        create_directory(outfile)
+
+        with open(outfile,'w') as f:
+
+            f.write('Topological phase transition boundaries\n\n')
+            f.write('{:>15}  {:>9}  {:>9}  {:>11}\n'.format('Temperature (K)','Pc1 (GPa)','Pc2 (GPa)','width (GPa)'))
+            f.write('{:>15}  {:>9.5f}  {:>9.5f}  {:>11.5f}\n'.format('Static',self.crit_pressure,self.crit_pressure2,self.crit_pressure2-self.crit_pressure))
+            for t, T in enumerate(self.ref_temp):
+                f.write('{:>15.2f}  {:>9.5f}  {:>9.5f}  {:>11.5f}\n'.format(T,self.pc1[t],self.pc2[t],self.pc2[t]-self.pc1[t]))
+
+        f.close()
+        return
 
     def plot_self_energy(self):
         
