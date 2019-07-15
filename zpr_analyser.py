@@ -61,7 +61,7 @@ class OUTfile(CDFfile):
 
     @property
     def nsym(self):
-        return self.symrel.shape[0]/9 if self.symrel is not None else None
+        return int(self.symrel.shape[0]/9) if self.symrel is not None else None
 
 
 class EIGfile(CDFfile):
@@ -134,10 +134,11 @@ class EPCfile(CDFfile):
             self.kpoints = ncdata.variables['reduced_coordinates_of_kpoints'][:,:]
             self.temp = ncdata.variables['temperatures'][:]
             self.td_ren = ncdata.variables['temperature_dependent_renormalization'][:,:,:,:]
-            self.fan_occ = ncdata.variables['temperature_dependent_renormalization_fan_occ'][:,:,:,:]
-            self.fan_unocc = ncdata.variables['temperature_dependent_renormalization_fan_unocc'][:,:,:,:]
-            self.ddw_occ = ncdata.variables['temperature_dependent_renormalization_ddw_occ'][:,:,:,:]
-            self.ddw_unocc = ncdata.variables['temperature_dependent_renormalization_ddw_unocc'][:,:,:,:]
+        # ONLY IF RAN WITH MY DEVELOP BRANCH
+        #    self.fan_occ = ncdata.variables['temperature_dependent_renormalization_fan_occ'][:,:,:,:]
+        #    self.fan_unocc = ncdata.variables['temperature_dependent_renormalization_fan_unocc'][:,:,:,:]
+        #    self.ddw_occ = ncdata.variables['temperature_dependent_renormalization_ddw_occ'][:,:,:,:]
+        #    self.ddw_unocc = ncdata.variables['temperature_dependent_renormalization_ddw_unocc'][:,:,:,:]
 
             self.zp_ren = ncdata.variables['zero_point_renormalization'][:,:,:]
             self.zp_ren_modes = ncdata.variables['zero_point_renormalization_by_modes'][:,:,:,:]
@@ -251,6 +252,8 @@ class EigenvalueCorrections(object):
     split = False,
     modes = False
     split_contribution = False
+    spline = False
+    spline_factor = 5
 
     def __init__(self,
 
@@ -270,6 +273,8 @@ class EigenvalueCorrections(object):
                 modes = False,
                 split_contribution = False,
                 split_occupied_subspace = False,
+                spline = False,
+                spline_factor = 5,
 
                 #Parameters
                 nsppol = None,
@@ -350,6 +355,8 @@ class EigenvalueCorrections(object):
         self.split = split
         self.modes = modes
         self.nband_contr = nband_contr
+        self.spline = spline
+        self.spline_factor = spline_factor
 
         # Units warning
         if self.units is not 'eV' and self.units is not 'meV':
@@ -743,7 +750,10 @@ class EigenvalueCorrections(object):
                     self.gap_loc, self.gap_energy, self.gap_renorm = self.get_gap_info(self.reduced_eig0, self.reduced_eigcorr,False)
                     if self.split:
                         self.gap_loc2, self.gap_energy2, self.gap_renorm2 = self.get_gap_info(self.reduced_eig0, self.reduced_eigcorr,True)
-                    kpts = self.reduced_kpath
+                    if self.spline:
+                        kpts = self.kpoints_fine
+                    else:
+                        kpts = self.reduced_kpath
 
                     if self.modes:
                         self.gap_renorm_modes = self.get_mode_info(self.gap_loc,self.reduced_zp_ren_modes,False)
@@ -767,7 +777,11 @@ class EigenvalueCorrections(object):
                     # The non-reduced option does not have as many possibilities as the reduced one... anyway if I have only gamma, it will reduce to itself! So, i could simply
                     # remove this option ???
                     self.gap_loc, self.gap_energy, self.gap_renorm = self.get_gap_info(self.eig0, self.eigcorr,False)
-                    kpts = self.kpoints
+
+                    if self.spline:
+                        kpts = self.kpoints_fine
+                    else:
+                        kpts = self.kpoints
 
                 create_directory(self.gap_dat)
 
@@ -857,6 +871,15 @@ class EigenvalueCorrections(object):
         val = self.valence - 1
         cond = val + 1
 
+        if self.spline:
+            # Interpolate kpoints
+            self.interpolate_kpoints()
+            # Interpolate bare eigenvalues
+            unpert = self.interpolate_eigenvalues(unpert)
+            # Interpolated eig(T)
+            for t in range(self.ntemp):
+                pert[:,:,:,t] = self.interpolate_eigenvalues(pert[:,:,:,t])
+
         if split == False:
 
 #            print(pert[:,:,27:28,:])
@@ -899,7 +922,10 @@ class EigenvalueCorrections(object):
             # Define mid in kpt array
             if not self.split_kpt:
                 raise Exception('split_kpt is not well-defined, as reduced_kpt_array cannot be splitted. Please check your input')
-            kmid = self.get_param_index(self.reduced_kpath, self.split_kpt)
+            if self.spline:
+                kmid = self.get_param_index(self.kpoints_fine, self.split_kpt)
+            else:
+                kmid = self.get_param_index(self.reduced_kpath, self.split_kpt)
 #            kmid = int(self.reduced_nkpt/2.)+1
 
             #Treat left gap
@@ -914,7 +940,7 @@ class EigenvalueCorrections(object):
                 loc[i+1,0] = np.argmin(arr)
                 ener[i+1,0] = np.amin(arr)*cst.ha_to_ev 
                 ren[i,0] = ener[i+1,0]-ener[0,0]
-                test = (unpert[0,:kmid,cond]-unpert[0,:kmid,val]+self.reduced_td_ren[0,:kmid,cond,i]-self.reduced_td_ren[0,:kmid,val,i])
+#                test = (unpert[0,:kmid,cond]-unpert[0,:kmid,val]+self.reduced_td_ren[0,:kmid,cond,i]-self.reduced_td_ren[0,:kmid,val,i])
 #                print(np.argmin(arr))
 #                print(ener[i+1,0])
        
@@ -929,7 +955,7 @@ class EigenvalueCorrections(object):
                 loc[i+1,1] = np.argmin(arr)+kmid
                 ener[i+1,1] = np.amin(arr)*cst.ha_to_ev 
                 ren[i,1] = ener[i+1,1]-ener[0,1]
-                test = (unpert[0,kmid:,cond]-unpert[0,kmid:,val]+self.reduced_td_ren[0,kmid:,cond,i]-self.reduced_td_ren[0,kmid:,val,i])
+ #               test = (unpert[0,kmid:,cond]-unpert[0,kmid:,val]+self.reduced_td_ren[0,kmid:,cond,i]-self.reduced_td_ren[0,kmid:,val,i])
  #               print(np.argmin(arr)+kmid)
   #              print(ener[i+1,1])
 
@@ -951,6 +977,16 @@ class EigenvalueCorrections(object):
         val = self.valence - 1
         cond = val + 1
 
+        if self.spline:
+            # Interpolate kpoints
+            self.interpolate_kpoints()
+            # Interpolate bare eigenvalues
+            unpert = self.interpolate_eigenvalues(unpert)
+            # Interpolated eig(T)
+            for t in range(self.ntemp):
+                pert[:,:,:,t] = self.interpolate_eigenvalues(pert[:,:,:,t])
+
+ 
         if split == False:
 
 #            print(pert[:,:,27:28,:])
@@ -1006,7 +1042,11 @@ class EigenvalueCorrections(object):
 
         
             # Define mid in kpt array
-            kmid = self.get_param_index(self.reduced_kpath, self.split_kpt)
+            if self.spline:
+                kmid = self.get_param_index(self.kpoints_fine, self.split_kpt)
+            else:
+                kmid = self.get_param_index(self.reduced_kpath, self.split_kpt)
+
 #            kmid = int(self.reduced_nkpt/2.)+1
 
             #Treat left gap
@@ -1061,6 +1101,39 @@ class EigenvalueCorrections(object):
                 return loc, ener*1000, ren*1000, ener_band*1000, ren_band*1000
             elif self.units == 'eV':
                 return loc, ener, ren, ener_band, ren_band
+
+    def interpolate_kpoints(self):
+        
+        self.nkpt_fine = self.nkpt*self.spline_factor
+        x = np.arange(self.nkpt)
+        xfine = np.linspace(x[0],x[-1],self.nkpt_fine)
+        kpts = np.zeros((self.nkpt_fine,3))
+
+        for i in range(3):
+            spl = interp1d(x, self.kpoints[:,i], kind='linear')
+            kpts[:,i] = spl(xfine)
+
+        self.kpoints_fine = kpts
+
+        return
+
+    def interpolate_eigenvalues(self.eig0):
+
+         x = np.arange(self.nkpt)
+         xfine = np.linspace(x[0],x[-1],self.nkpt_fine)
+
+         if self.nsppol is None:
+             self.nsppol = eig0.nsppol
+         if self.max_band is None:
+             self.max_band = eig0.max_band
+
+         eig = np.zeros((self.nsppol,self.nkpt_fine,self.max_band))
+
+         for j in range(self.max_band):
+             spl = interp1d(x,eig0[0,:,j], kind='cubic')
+             eig[0,:,j] = spl(xfine)
+
+        return eig
 
     def get_mode_info(self,loc, mode_ren, split):
         # Gets direct gap information, splitted into mode contribution
@@ -1266,6 +1339,9 @@ class EigenvalueCorrections(object):
             dts.createDimension('number_of_modes',3*self.natom)
 
             # Create and write variables
+            data = ds.createVariable('spline_interpolation', 'i1')
+            data[:] = self.spline
+
             ## Bare variables
             data = dts.createVariable('temperatures', 'd', ('number_of_temperatures'))
             data[:] = self.temp[:]
@@ -1330,16 +1406,28 @@ class EigenvalueCorrections(object):
             data = dts.createVariable('unperturbed_gap_location', 'd', ('cartesian'))   
             if self.gap_ren:
                 if self.reduce_path:
-                    data[:] = self.reduced_kpath[self.gap_loc[0]]
+                    if self.spline:
+                        data[:] = self.kpoints_fine[self.gap_loc[0]]
+                    else:
+                        data[:] = self.reduced_kpath[self.gap_loc[0]]
                 else:
-                    data[:] = self.kpoints[self.gap_loc[0]]
+                    if self.spline:
+                        data[:] = self.kpoints_fine[self.gap_loc[0]]
+                    else:
+                        data[:] = self.kpoints[self.gap_loc[0]]
 
             data = dts.createVariable('gap_location', 'd',('number_of_temperatures', 'cartesian'))
             if self.gap_ren:
                 if self.reduce_path:
-                    data[:,:] =  self.reduced_kpath[self.gap_loc[1:]]
+                    if self.spline:
+                        data[:,:] =  self.kpoints_fine[self.gap_loc[1:]]
+                    else:
+                        data[:,:] =  self.reduced_kpath[self.gap_loc[1:]]
                 else:
-                    data[:,:] = self.kpoints[self.gap_loc[1:]]
+                    if self.spline:
+                        data[:,:] = self.kpoints_fine[self.gap_loc[1:]]
+                    else:
+                        data[:,:] = self.kpoints[self.gap_loc[1:]]
 
             data = dts.createVariable('unperturbed_gap_energy', 'd', ('one'))
             data.units = self.units
@@ -1360,14 +1448,20 @@ class EigenvalueCorrections(object):
             data = dts.createVariable('unperturbed_indirect_gap_location', 'd', ('cplex','cartesian')) #(vb-cb, cart)  
             if self.gap_ren and self.indirect:
                 if self.reduce_path:
-                    data[:,:] = self.reduced_kpath[self.indirect_gap_loc[0,:]]
+                    if self.spline:
+                        data[:,:] = self.kpoints_fine[self.indirect_gap_loc[0,:]]
+                    else:
+                        data[:,:] = self.reduced_kpath[self.indirect_gap_loc[0,:]]
 #                else:
 #                    data[:] = self.kpoints[self.gap_loc[0]]
 
             data = dts.createVariable('indirect_gap_location', 'd',('number_of_temperatures', 'cplex','cartesian'))
             if self.gap_ren:
                 if self.indirect and self.reduce_path:
-                    data[:,:,:] =  self.reduced_kpath[self.indirect_gap_loc[1:,:]]
+                    if self.spline:
+                        data[:,:,:] = self.kpoints_fine[self.indirect_gap_loc[1:,:]]
+                    else:
+                        data[:,:,:] =  self.reduced_kpath[self.indirect_gap_loc[1:,:]]
 #            else:
 #                data[:,:] = self.kpoints[self.gap_loc[1:]]
 
@@ -1404,14 +1498,20 @@ class EigenvalueCorrections(object):
             data = dts.createVariable('unperturbed_indirect_gap_location_split', 'd', ('cplex','cplex','cartesian'))   # (left-right, val-cond)
             if self.gap_ren:
                 if self.reduce_path and self.split:
-                    data[:,:,:] = self.reduced_kpath[self.indirect_gap_loc2[0,:,:]]
+                    if self.spline:
+                        data[:,:,:] = self.kpoints_fine[self.indirect_gap_loc2[0,:,:]]
+                    else:
+                        data[:,:,:] = self.reduced_kpath[self.indirect_gap_loc2[0,:,:]]
 #                else:
 #                    data[:] = self.kpoints[self.gap_loc[0]]
 
             data = dts.createVariable('indirect_gap_location_split', 'd',('number_of_temperatures', 'cplex', 'cplex','cartesian'))
             if self.gap_ren:
                 if self.reduce_path and self.split:
-                    data[:,:,:,:] =  self.reduced_kpath[self.indirect_gap_loc2[1:,:,:]] #(temp, cart, lfet-right, val-cond)
+                    if self.spline:
+                        data[:,:,:,:] =  self.kpoints_fine[self.indirect_gap_loc2[1:,:,:]] #(temp, cart, lfet-right, val-cond)  
+                    else:
+                        data[:,:,:,:] =  self.reduced_kpath[self.indirect_gap_loc2[1:,:,:]] #(temp, cart, lfet-right, val-cond)
 #            else:
 #                data[:,:] = self.kpoints[self.gap_loc[1:]]
 
@@ -1508,11 +1608,17 @@ class EigenvalueCorrections(object):
             ## Split quantities for left/right gaps
             data = dts.createVariable('unperturbed_gap_location_split', 'd', ('cplex','cartesian'))   
             if self.gap_ren and self.split:
-                data[:,:] = self.reduced_kpath[self.gap_loc2[0,:]]
+                if self.spline:
+                    data[:,:] = self.kpoints_fine[self.gap_loc2[0,:]]
+                else:
+                    data[:,:] = self.reduced_kpath[self.gap_loc2[0,:]]
     
             data = dts.createVariable('gap_location_split', 'd',('number_of_temperatures', 'cplex', 'cartesian'))
             if self.split and self.gap_ren:
-                data[:,:,:] =  self.reduced_kpath[self.gap_loc2[1:,:]]
+                if self.spline:
+                    data[:,:,:] = self.kpoints_fine[self.gap_loc2[1:,:]]
+                else:
+                    data[:,:,:] =  self.reduced_kpath[self.gap_loc2[1:,:]]
     
             data = dts.createVariable('gap_energy_split', 'd', ('number_of_temperatures', 'cplex'))
             data.units = self.units
@@ -1653,6 +1759,8 @@ def compute(
         modes=False,
         split_contribution = False,
         split_occupied_subspace = False,
+        spline = False,
+        spline_factor = 5,
 
         **kwargs):
 
@@ -1690,6 +1798,8 @@ def compute(
             points_to_print = points_to_print,
             split_kpt = split_kpt,
             nband_contr = nband_contr,
+            spline = spline,
+            spline_factor = spline_factor,
 
             **kwargs)
     

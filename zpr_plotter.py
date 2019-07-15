@@ -1,5 +1,6 @@
 #! /usr/bin/env python
-
+import matplotlib
+matplotlib.use('TKAgg')
 from matplotlib import rc
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
