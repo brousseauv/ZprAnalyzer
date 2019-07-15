@@ -122,6 +122,7 @@ class TEfile(CDFfile):
             self.correction = ncdata.variables['eigenvalue_corrections'][:,:,:,:]
 
             self.eig0 = ncdata.variables['bare_eigenvalues'][:,:,:]
+            self.kpoints = ncdata.variables['reduced_coordinates_of_kpoints'][:,:]
             self.unperturbed_gap_location = ncdata.variables['unperturbed_gap_location'][:]
             self.unperturbed_gap_energy = ncdata.variables['unperturbed_gap_energy'][:]
             self.gap_location = ncdata.variables['gap_location'][:,:]
@@ -3748,6 +3749,7 @@ class ZPR_plotter(object):
         # Read and treat all input files
         for ifile, te_file in enumerate(self.te_fnames):
                 
+            print(te_file)
             # Define file class
             self.te = TEfile(te_file, read=False)
 
@@ -3755,29 +3757,28 @@ class ZPR_plotter(object):
             self.read_file()
 
             # Set parameters for this file
-#            self.nsppol = self.zpr.nsppol
-#            self.nkpt = self.zpr.nkpt
-#            self.max_band = self.zpr.max_band
+            self.nsppol = self.te.nsppol
+            self.nkpt = self.te.nkpt
+            self.max_band = self.te.max_band
             self.ntemp = self.te.ntemp
             self.temp = self.te.temp
-#            self.kpoints = self.zpr.kpoints
+            self.kpoints = self.te.kpoints
            ################### HERE ############################ 
 #            self.gridsize = self.zpr.gridsize
             self.gap_units = self.te.gap_energy_units
 
             input_units = self.te.gap_energy_units
-            print(input_units)
 
             if input_units == self.units:
                 pass
             else:
                 if self.units == 'eV':
-                    self.eig0 = self.zpr.eig0*cst.ha_to_ev
-                    self.eigcorr = self.zpr.eigcorr*cst.ha_to_ev
+                    self.eig0 = self.te.eig0*cst.ha_to_ev
+                    self.eigcorr = self.te.eigcorr*cst.ha_to_ev
                 if self.units == 'meV':
-                    self.eig0 = self.zpr.eig0*cst.ha_to_ev*1000
-                    self.eigcorr = self.zpr.eigcorr*cst.ha_to_ev*1000
-            print('out') 
+                    self.eig0 = self.te.eig0*cst.ha_to_ev*1000
+                    self.eigcorr = self.te.eigcorr*cst.ha_to_ev*1000
+
             # Set side of phase transition for split2 option
             if self.split2:
                 if self.pressure[ifile] < self.crit_pressure:
@@ -3787,10 +3788,10 @@ class ZPR_plotter(object):
 
             # Retrieve data from file
             if self.split:
-                self.loc0 = self.zpr.unperturbed_indirect_gap_location_split
-#                self.gap_location = self.zpr.gap_location_split
-                self.gap_ren = self.zpr.indirect_gap_ren_split
-                self.band_ren = self.zpr.indirect_gap_ren_band_split
+                self.loc0 = self.te.unperturbed_indirect_gap_location_split
+#                self.gap_location = self.te.gap_location_split
+                self.gap_ren = self.te.indirect_gap_ren_split
+                self.band_ren = self.te.indirect_gap_ren_band_split
 
                 gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
                 for a in range(2):
@@ -3798,10 +3799,10 @@ class ZPR_plotter(object):
                     gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
 
             if self.split2:
-                self.loc0 = self.zpr.unperturbed_indirect_gap_location_split
-#                self.gap_location = self.zpr.indirect_gap_location_split
-                self.gap_ren = self.zpr.indirect_gap_ren_split
-                self.band_ren = self.zpr.indirect_gap_ren_band_split # T left/right vb/cb
+                self.loc0 = self.te.unperturbed_indirect_gap_location_split
+#                self.gap_location = self.te.indirect_gap_location_split
+                self.gap_ren = self.te.indirect_gap_ren_split
+                self.band_ren = self.te.indirect_gap_ren_band_split # T left/right vb/cb
 
                 gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
                 for a in range(2):
@@ -3810,10 +3811,10 @@ class ZPR_plotter(object):
 
  
             else:
-                self.loc0 = self.zpr.unperturbed_indirect_gap_location
-#                self.gap_location = self.zpr.gap_location
-                self.gap_ren = self.zpr.indirect_gap_ren
-                self.band_ren = self.zpr.indirect_gap_ren_band
+                self.loc0 = self.te.unperturbed_indirect_gap_location
+#                self.gap_location = self.te.gap_location
+                self.gap_ren = self.te.indirect_gap_ren
+                self.band_ren = self.te.indirect_gap_ren_band
                 gap_index0 = np.zeros((2),dtype=int)
                 for a in range(2):
                     gap_index0[a] = self.find_gap_index(self.loc0[a])
@@ -3992,42 +3993,42 @@ class ZPR_plotter(object):
 
 
 
-        if self.split:
-            self.set_xaxis(_arr2[2][0], self.pressure)
-            self.set_yaxis_separate(_arr2[0][0], 'CB ren ({})'.format(self.gap_units),self.cond_ylims, self.cond_yticks)
-            self.set_yaxis_separate(_arr2[1][0], 'VB ren ({})'.format(self.gap_units),self.val_ylims, self.val_yticks)
-            self.set_yaxis_separate(_arr2[2][0], 'Gap ren ({})'.format(self.gap_units),self.gap_ylims, self.gap_yticks)
-
-            self.set_title(_arr[0][0], self.title[0])
-            self.set_title(_arr2[0][0], self.title[1])
-
-        else:
-            if self.main_title:
-                self.set_title(_arr0[0][0], self.main_title)
-
-        # Custum stuff
-        _arr[2][0].text(0.7,-82, r'$\mathbb{Z}_2\!=\!0$', fontsize=24,color='k')
-        _arr[2][0].text(2.7, -82, r'$\mathbb{Z}_2\!=\!1$',fontsize = 24,color='k')
-        _arr[2][0].text(1.85,-60,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
-        _arr[2][0].text(1.35,-60,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
-
-        legend_handles = [] 
-        for t, temp in enumerate(self.ref_temp):
-            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
-#                Line2D([0],[0],color='b',marker='o',markersize=8,linestyle='None',label=r'P$_{\text{C2}}$ plane')]
-        #legend_handles.append('')
-        #legend_handles.append('')
-
-        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = len(self.ref_temp),columnspacing=1)
-        _arr[0][0].add_artist(legend1)
-        
-        legend2_handles=[]
-        legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
-        legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
-        legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1,borderpad=0.2)
-        _arr[0][0].add_artist(legend2)
-
-        fig.subplots_adjust(hspace=0.0,top=0.90,right=0.95)
+#        if self.split:
+#            self.set_xaxis(_arr2[2][0], self.pressure)
+#            self.set_yaxis_separate(_arr2[0][0], 'CB ren ({})'.format(self.gap_units),self.cond_ylims, self.cond_yticks)
+#            self.set_yaxis_separate(_arr2[1][0], 'VB ren ({})'.format(self.gap_units),self.val_ylims, self.val_yticks)
+#            self.set_yaxis_separate(_arr2[2][0], 'Gap ren ({})'.format(self.gap_units),self.gap_ylims, self.gap_yticks)
+#
+#            self.set_title(_arr[0][0], self.title[0])
+#            self.set_title(_arr2[0][0], self.title[1])
+#
+#        else:
+#            if self.main_title:
+#                self.set_title(_arr0[0][0], self.main_title)
+#
+#        # Custum stuff
+#        _arr[2][0].text(0.7,-82, r'$\mathbb{Z}_2\!=\!0$', fontsize=24,color='k')
+#        _arr[2][0].text(2.7, -82, r'$\mathbb{Z}_2\!=\!1$',fontsize = 24,color='k')
+#        _arr[2][0].text(1.85,-60,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
+#        _arr[2][0].text(1.35,-60,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
+#
+#        legend_handles = [] 
+#        for t, temp in enumerate(self.ref_temp):
+#            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
+##                Line2D([0],[0],color='b',marker='o',markersize=8,linestyle='None',label=r'P$_{\text{C2}}$ plane')]
+#        #legend_handles.append('')
+#        #legend_handles.append('')
+#
+#        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = len(self.ref_temp),columnspacing=1)
+#        _arr[0][0].add_artist(legend1)
+#        
+#        legend2_handles=[]
+#        legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
+#        legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
+#        legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1,borderpad=0.2)
+#        _arr[0][0].add_artist(legend2)
+#
+#        fig.subplots_adjust(hspace=0.0,top=0.90,right=0.95)
 
         if self.split:
             fig.align_ylabels()
@@ -4625,7 +4626,16 @@ class ZPR_plotter(object):
         loclst = list(loc)
         lst = [list(x) for x in self.kpoints]
 
-        return lst.index(loclst)
+        #index = lst.index(loclst)
+
+        #if index is not None:
+        #    return index
+        #else:
+        for k,kpoint in enumerate(lst):
+            index = np.allclose(loclst,k)
+            if index==True:
+                print(index,k)
+        return 
 
     def find_temp_index(self):
 
