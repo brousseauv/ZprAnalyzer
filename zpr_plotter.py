@@ -3892,7 +3892,6 @@ class ZPR_plotter(object):
             crit_index = self.find_temp_index()
         else:
             crit_index = None
-#        print(crit_index)
 
         for T in range(self.ntemp):
 
@@ -3984,6 +3983,9 @@ class ZPR_plotter(object):
         self.set_yaxis(_arr[1][0], 'VB ren ({})'.format(self.gap_units))
         self.set_yaxis(_arr[2][0], 'Gap ren ({})'.format(self.gap_units))
 
+#        if self.main_title:
+#            self.set_title(_arr[0][0], self.main_title)
+
         fig.subplots_adjust(left=0.11,bottom=0.08,right=0.81,top=0.95,wspace=0.2,hspace=0.12)
 
         #_arr[1,0].text(self.explicit_pressures[8],300, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=30)
@@ -4012,22 +4014,22 @@ class ZPR_plotter(object):
 #        _arr[2][0].text(1.85,-60,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
 #        _arr[2][0].text(1.35,-60,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
 #
-#        legend_handles = [] 
-#        for t, temp in enumerate(self.ref_temp):
-#            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
-##                Line2D([0],[0],color='b',marker='o',markersize=8,linestyle='None',label=r'P$_{\text{C2}}$ plane')]
-#        #legend_handles.append('')
-#        #legend_handles.append('')
-#
-#        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = len(self.ref_temp),columnspacing=1)
-#        _arr[0][0].add_artist(legend1)
-#        
-#        legend2_handles=[]
-#        legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
-#        legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
-#        legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1,borderpad=0.2)
-#        _arr[0][0].add_artist(legend2)
-#
+        legend_handles = [] 
+        for t, temp in enumerate(self.ref_temp):
+            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
+#                Line2D([0],[0],color='b',marker='o',markersize=8,linestyle='None',label=r'P$_{\text{C2}}$ plane')]
+        #legend_handles.append('')
+        #legend_handles.append('')
+
+        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = len(self.ref_temp),columnspacing=1)
+        _arr[0][0].add_artist(legend1)
+        
+        legend2_handles=[]
+        legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
+        legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
+        legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1,borderpad=0.2)
+        _arr[0][0].add_artist(legend2)
+
 #        fig.subplots_adjust(hspace=0.0,top=0.90,right=0.95)
 
         if self.split:
@@ -4632,10 +4634,11 @@ class ZPR_plotter(object):
         #    return index
         #else:
         for k,kpoint in enumerate(lst):
-            index = np.allclose(loclst,k)
+            index = np.allclose(loclst,kpoint)
             if index==True:
                 print(index,k)
-        return 
+                return k
+
 
     def find_temp_index(self):
 
@@ -4651,7 +4654,7 @@ class ZPR_plotter(object):
                 return lst.index(self.tmax)
             else:
                 return None
-        if self.pgap:
+        if self.pgap or self.te_pgap:
             lst = list(self.pressure)
             if self.crit_pressure in lst:
                 return lst.index(self.crit_pressure)
@@ -4735,7 +4738,7 @@ class ZPR_plotter(object):
                     for itick, tick in enumerate(f.xaxis.get_majorticklabels()):
                         tick.set_horizontalalignment(self.xticks_alignment[itick]) 
 
-        if self.pgap or self.split_occupied_subspace:
+        if self.pgap or self.split_occupied_subspace or self.te_pgap:
             lims = (min(self.pressure)-0.1, max(self.pressure)+0.1)
             f.set_xlim(lims)
             f.xaxis.set_major_formatter(FuncFormatter(self.label_formatter))
