@@ -658,8 +658,12 @@ class ZPR_plotter(object):
             self.spectral_function = self.zpr.spectral_function
             self.broadening = self.zpr.broadening
             self.smearing = self.zpr.smearing
+            self.spline = True
 
             kpt_array = np.arange(self.nkpt)
+            if self.spline:
+                self.nkpt_fine = 5*self.nkpt
+                kpt_array_fine = np.linspace(kpt_array[0],kpt_array[-1],self.nkpt_fine)
             scissor_array = np.zeros(self.max_band)
 
             if self.tmax is None:
@@ -683,6 +687,41 @@ class ZPR_plotter(object):
                     self.scissor[1] = self.scissor[1]*1000
 
 
+            if self.spline:
+                from scipy.interpolate import interp1d
+
+                nband = len(self.bands_to_print)
+
+                # Find index of A point 
+                kpt_is_a = self.find_gap_index([0.0, 0.0, 0.5])
+                if kpt_is_a is None:
+                    kpt_is_a = self.find_gap_index([0.0, 0.0,0.53849])
+
+                #First, treat the bare eigenvalues
+                self.eig0_int = np.zeros((self.nsppol, self.nkpt_fine,nband))
+                eig0 = np.zeros((self.nsppol, self.nkpt,nband))
+                eig0[0,:,0] = np.concatenate((self.eig0[0,:kpt_is_a,self.bands_to_print[0]-1],self.eig0[0,kpt_is_a:,self.bands_to_print[1]-1]))
+                eig0[0,:,1] = np.concatenate((self.eig0[0,:kpt_is_a,self.bands_to_print[1]-1],self.eig0[0,kpt_is_a:,self.bands_to_print[0]-1]))
+                eig0[0,:,2] = np.concatenate((self.eig0[0,:kpt_is_a,self.bands_to_print[2]-1],self.eig0[0,kpt_is_a:,self.bands_to_print[3]-1]))
+                eig0[0,:,3] = np.concatenate((self.eig0[0,:kpt_is_a,self.bands_to_print[3]-1],self.eig0[0,kpt_is_a:,self.bands_to_print[2]-1]))
+
+                for iband, band in enumerate(self.bands_to_print): 
+                    spl0 = interp1d(kpt_array,eig0[0,:,iband], kind='cubic')
+                    self.eig0_int[0,:,iband] = spl0(kpt_array_fine)
+
+                # Then, the Tdep ones
+                self.eigcorr_int = np.zeros((self.nsppol, self.nkpt_fine, nband, self.ntemp))
+                for t in range(self.ntemp):
+                    eig = np.zeros((self.nsppol, self.nkpt,nband))
+                    eig[0,:,0] = np.concatenate((self.eigcorr[0,:kpt_is_a,self.bands_to_print[0]-1,t],self.eigcorr[0,kpt_is_a:,self.bands_to_print[1]-1,t]))
+                    eig[0,:,1] = np.concatenate((self.eigcorr[0,:kpt_is_a,self.bands_to_print[1]-1,t],self.eigcorr[0,kpt_is_a:,self.bands_to_print[0]-1,t]))
+                    eig[0,:,2] = np.concatenate((self.eigcorr[0,:kpt_is_a,self.bands_to_print[2]-1,t],self.eigcorr[0,kpt_is_a:,self.bands_to_print[3]-1,t]))
+                    eig[0,:,3] = np.concatenate((self.eigcorr[0,:kpt_is_a,self.bands_to_print[3]-1,t],self.eigcorr[0,kpt_is_a:,self.bands_to_print[2]-1,t]))
+
+                    for iband, band in enumerate(self.bands_to_print): 
+                        spl0 = interp1d(kpt_array,eig[0,:,iband], kind='cubic')
+                        self.eigcorr_int[0,:,iband,t] = spl0(kpt_array_fine)
+                
             # this is just a quick check for relative error when using the double grid. For a given kpt index and band index, compute omega_max/(Emax-Ekn)
 #            omax = 0.02
 #            err = np.zeros((5,2))
@@ -727,25 +766,47 @@ class ZPR_plotter(object):
             
             for iplot in range(plot_qty):
 
-                if self.bands_to_print:
-                    for iband in self.bands_to_print:
-                        arr[iplot][ifile].plot(kpt_array, self.eig0[0,:,iband-1]-self.fermi_td[ifile]+scissor_array[iband-1], color='k',linewidth=1.5)
-                        
-                        if self.subplots:
-                            arr[iplot][ifile].plot(kpt_array, self.eigcorr[0,:,iband-1,iplot]-self.fermi_td[ifile]+scissor_array[iband-1], color=self.color[iplot],linewidth=1.5)
-                        else:
-                            for itemp in range(tmax_index+1):
-                                arr[iplot][ifile].plot(kpt_array, self.eigcorr[0,:,iband-1,itemp]-self.fermi_td[ifile]+scissor_array[iband-1], color = self.color[itemp],linewidth=1.5)
-        
+                if self.spline == True:
+                    if self.bands_to_print:
+                        for jband,iband in enumerate(self.bands_to_print):
+                            arr[iplot][ifile].plot(kpt_array_fine, self.eig0_int[0,:,jband]-self.fermi_td[ifile]+scissor_array[iband-1], color='k',linewidth=1.5)
+                            
+                            if self.subplots:
+                                arr[iplot][ifile].plot(kpt_array_fine, self.eigcorr_int[0,:,jband,iplot]-self.fermi_td[ifile]+scissor_array[iband-1], color=self.color[iplot],linewidth=1.5)
+                            else:
+                                for itemp in range(tmax_index+1):
+                                    arr[iplot][ifile].plot(kpt_array_fine, self.eigcorr_int[0,:,jband,itemp]-self.fermi_td[ifile]+scissor_array[iband-1], color = self.color[itemp],linewidth=1.5)
+            
+                    else:
+                        for iband in range(self.max_band):
+                            arr[iplot][ifile].plot(kpt_array_fine, self.eig0_int[0,:,iband]-self.fermi_td[ifile]+scissor_array[iband], color='k', label='Static T=0')
+                            
+                            if self.subplots:
+                                arr[iplot][ifile].plot(kpt_array_fine, self.eigcorr_int[0,:,jband,iplot]-self.fermi_td[ifile]+scissor_array[iband], color = self.color[iplot], label=str(self.temp[iplot])+'K')
+                            else:
+                                for itemp in range(tmax_index+1):
+                                    arr[iplot][ifile].plot(kpt_array_fine, self.eigcorr_int[0,:,jband,itemp]-self.fermi_td[ifile]+scissor_array[iband], color = self.color[itemp], label=str(self.temp[itemp])+'K')
+     
                 else:
-                    for iband in range(self.max_band):
-                        arr[iplot][ifile].plot(kpt_array, self.eig0[0,:,iband]-self.fermi_td[ifile]+scissor_array[iband], color='k', label='Static T=0')
-                        
-                        if self.subplots:
-                            arr[iplot][ifile].plot(kpt_array, self.eigcorr[0,:,iband,iplot]-self.fermi_td[ifile]+scissor_array[iband], color = self.color[iplot], label=str(self.temp[iplot])+'K')
-                        else:
-                            for itemp in range(tmax_index+1):
-                                arr[iplot][ifile].plot(kpt_array, self.eigcorr[0,:,iband,itemp]-self.fermi_td[ifile]+scissor_array[iband], color = self.color[itemp], label=str(self.temp[itemp])+'K')
+                    if self.bands_to_print:
+                        for iband in self.bands_to_print:
+                            arr[iplot][ifile].plot(kpt_array, self.eig0[0,:,iband-1]-self.fermi_td[ifile]+scissor_array[iband-1], color='k',linewidth=1.5)
+                            
+                            if self.subplots:
+                                arr[iplot][ifile].plot(kpt_array, self.eigcorr[0,:,iband-1,iplot]-self.fermi_td[ifile]+scissor_array[iband-1], color=self.color[iplot],linewidth=1.5)
+                            else:
+                                for itemp in range(tmax_index+1):
+                                    arr[iplot][ifile].plot(kpt_array, self.eigcorr[0,:,iband-1,itemp]-self.fermi_td[ifile]+scissor_array[iband-1], color = self.color[itemp],linewidth=1.5)
+            
+                    else:
+                        for iband in range(self.max_band):
+                            arr[iplot][ifile].plot(kpt_array, self.eig0[0,:,iband]-self.fermi_td[ifile]+scissor_array[iband], color='k', label='Static T=0')
+                            
+                            if self.subplots:
+                                arr[iplot][ifile].plot(kpt_array, self.eigcorr[0,:,iband,iplot]-self.fermi_td[ifile]+scissor_array[iband], color = self.color[iplot], label=str(self.temp[iplot])+'K')
+                            else:
+                                for itemp in range(tmax_index+1):
+                                    arr[iplot][ifile].plot(kpt_array, self.eigcorr[0,:,iband,itemp]-self.fermi_td[ifile]+scissor_array[iband], color = self.color[itemp], label=str(self.temp[itemp])+'K')
     
                 # Set xlims, xticks, xtickslabels
                 self.set_xaxis(arr[iplot][ifile],kpt_array)
@@ -769,8 +830,6 @@ class ZPR_plotter(object):
 
 #        self.set_main_title(fig)
         self.save_figure(fig)
-
-        plt.show()
 
 
     def plot_vbcb(self):
