@@ -1639,10 +1639,11 @@ class ZPR_plotter(object):
                 self.gap_ren = self.zpr.indirect_gap_ren_split
                 self.band_energy = self.zpr.indirect_gap_energy_band_split
 
-                gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
-                for a in range(2):
-                    gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
-                    gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
+                if self.unpert:
+                    gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
+                    for a in range(2):
+                        gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
+                        gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
 
             elif self.split2:
                 if self.pressure[ifile] > self.crit_pressure:
@@ -1657,10 +1658,11 @@ class ZPR_plotter(object):
                 self.gap_ren = self.zpr.indirect_gap_ren_split
                 self.band_energy = self.zpr.indirect_gap_energy_band_split
 
-                gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
-                for a in range(2):
-                    gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
-                    gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
+                if self.unpert:
+                    gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
+                    for a in range(2):
+                        gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
+                        gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
 
  
 
@@ -1671,9 +1673,10 @@ class ZPR_plotter(object):
                 self.gap_energy = self.zpr.indirect_gap_energy
                 self.gap_ren = self.zpr.indirect_gap_ren
 
-                gap_index0 = np.zeros((2),dtype = int)
-                gap_index0[0] = self.find_gap_index(self.loc0[0])
-                gap_index0[1] = self.find_gap_index(self.loc0[1])
+                if self.unpert:
+                    gap_index0 = np.zeros((2),dtype = int)
+                    gap_index0[0] = self.find_gap_index(self.loc0[0])
+                    gap_index0[1] = self.find_gap_index(self.loc0[1])
 
             # Initialize full arrays
             if ifile==0:
@@ -3081,10 +3084,11 @@ class ZPR_plotter(object):
                 self.gap_ren = self.zpr.indirect_gap_ren_split
                 self.band_ren = self.zpr.indirect_gap_ren_band_split
 
-                gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
-                for a in range(2):
-                    gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
-                    gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
+                if self.unpert:
+                    gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
+                    for a in range(2):
+                        gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
+                        gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
 
             if self.split2:
                 self.loc0 = self.zpr.unperturbed_indirect_gap_location_split
@@ -3092,10 +3096,11 @@ class ZPR_plotter(object):
                 self.gap_ren = self.zpr.indirect_gap_ren_split
                 self.band_ren = self.zpr.indirect_gap_ren_band_split # T left/right vb/cb
 
-                gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
-                for a in range(2):
-                    gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
-                    gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
+                if self.unpert:
+                    gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
+                    for a in range(2):
+                        gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
+                        gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
 
  
             else:
@@ -3103,9 +3108,10 @@ class ZPR_plotter(object):
 #                self.gap_location = self.zpr.gap_location
                 self.gap_ren = self.zpr.indirect_gap_ren
                 self.band_ren = self.zpr.indirect_gap_ren_band
-                gap_index0 = np.zeros((2),dtype=int)
-                for a in range(2):
-                    gap_index0[a] = self.find_gap_index(self.loc0[a])
+                if self.unpert:
+                    gap_index0 = np.zeros((2),dtype=int)
+                    for a in range(2):
+                        gap_index0[a] = self.find_gap_index(self.loc0[a])
 
 
             # Initialize plotting arrays
@@ -4569,7 +4575,7 @@ class ZPR_plotter(object):
 
     def write_phase_diagram(self):
 
-        outfile = 'phase_diagram.dat'
+        outfile = '{}_phase_diagram.dat'.format(self.rootname)
 
         create_directory(outfile)
 

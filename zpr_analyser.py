@@ -8,6 +8,7 @@ import sys
 import os
 import warnings
 import itertools as itt
+from scipy.interpolate import interp1d
 
 ############################
 # This code retreives zpr and temperature-dependent corrections to the electronic eigenvalues computed with ABINIT and post-processed with G.Antonius's ElectronPhononCoupling module
@@ -877,8 +878,11 @@ class EigenvalueCorrections(object):
             # Interpolate bare eigenvalues
             unpert = self.interpolate_eigenvalues(unpert)
             # Interpolated eig(T)
+            tmp = np.zeros((self.nsppol,self.nkpt_fine,self.max_band,self.ntemp))
             for t in range(self.ntemp):
-                pert[:,:,:,t] = self.interpolate_eigenvalues(pert[:,:,:,t])
+                tmp[:,:,:,t] = self.interpolate_eigenvalues(pert[:,:,:,t])
+
+            pert = tmp
 
         if split == False:
 
@@ -922,10 +926,11 @@ class EigenvalueCorrections(object):
             # Define mid in kpt array
             if not self.split_kpt:
                 raise Exception('split_kpt is not well-defined, as reduced_kpt_array cannot be splitted. Please check your input')
-            if self.spline:
-                kmid = self.get_param_index(self.kpoints_fine, self.split_kpt)
-            else:
-                kmid = self.get_param_index(self.reduced_kpath, self.split_kpt)
+#            if self.spline:
+            '''FIX ME does not work with all spline_factors. Sometimes it returns kmid=None... '''
+            kmid = self.find_kpt_index(self.split_kpt)
+ #           else:
+ #               kmid = self.get_param_index(self.reduced_kpath, self.split_kpt)
 #            kmid = int(self.reduced_nkpt/2.)+1
 
             #Treat left gap
@@ -983,10 +988,13 @@ class EigenvalueCorrections(object):
             # Interpolate bare eigenvalues
             unpert = self.interpolate_eigenvalues(unpert)
             # Interpolated eig(T)
+            tmp = np.zeros((self.nsppol,self.nkpt_fine,self.max_band,self.ntemp))
             for t in range(self.ntemp):
-                pert[:,:,:,t] = self.interpolate_eigenvalues(pert[:,:,:,t])
+                tmp[:,:,:,t] = self.interpolate_eigenvalues(pert[:,:,:,t])
 
- 
+            pert = tmp
+
+
         if split == False:
 
 #            print(pert[:,:,27:28,:])
@@ -1104,22 +1112,34 @@ class EigenvalueCorrections(object):
 
     def interpolate_kpoints(self):
         
-        self.nkpt_fine = self.nkpt*self.spline_factor
-        x = np.arange(self.nkpt)
+        if self.reduce_path:
+            nkpt = self.reduced_nkpt
+            kpts_coarse = self.reduced_kpath
+        else:
+            nkpt = self.nkpt
+            kpts_coarse = self.kpoints
+
+        self.nkpt_fine = nkpt*self.spline_factor
+        x = np.arange(nkpt)
         xfine = np.linspace(x[0],x[-1],self.nkpt_fine)
         kpts = np.zeros((self.nkpt_fine,3))
 
         for i in range(3):
-            spl = interp1d(x, self.kpoints[:,i], kind='linear')
+            spl = interp1d(x, kpts_coarse[:,i], kind='linear')
             kpts[:,i] = spl(xfine)
 
         self.kpoints_fine = kpts
 
         return
 
-    def interpolate_eigenvalues(self.eig0):
+    def interpolate_eigenvalues(self,eig0):
 
-         x = np.arange(self.nkpt)
+         if self.reduce_path:
+             nkpt = self.reduced_nkpt
+         else:
+             nkpt = self.nkpt
+
+         x = np.arange(nkpt)
          xfine = np.linspace(x[0],x[-1],self.nkpt_fine)
 
          if self.nsppol is None:
@@ -1133,7 +1153,25 @@ class EigenvalueCorrections(object):
              spl = interp1d(x,eig0[0,:,j], kind='cubic')
              eig[0,:,j] = spl(xfine)
 
-        return eig
+         return eig
+
+    def find_kpt_index(self, loc):
+
+        # This locates a given kpoint in a list, within a given tolerance
+        loclst = list(loc)
+        if self.spline:
+            lst = [list(x) for x in self.kpoints_fine]
+        elif self.reduce_path:
+            lst = [list(x) for x in self.reduced_kpath]
+        else:
+            lst = [list(x) for x in self.kpoints]
+
+        for k,kpoint in enumerate(lst):
+            index = np.allclose(loclst,kpoint)
+            if index==True:
+                print(kpoint)
+                return k
+
 
     def get_mode_info(self,loc, mode_ren, split):
         # Gets direct gap information, splitted into mode contribution
@@ -1339,7 +1377,7 @@ class EigenvalueCorrections(object):
             dts.createDimension('number_of_modes',3*self.natom)
 
             # Create and write variables
-            data = ds.createVariable('spline_interpolation', 'i1')
+            data = dts.createVariable('spline_interpolation', 'i1')
             data[:] = self.spline
 
             ## Bare variables
