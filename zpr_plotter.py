@@ -13,7 +13,7 @@ import os
 import warnings
 import itertools as itt
 from copy import copy
-
+from scipy.interpolate import interp1d
 ############################
 # this code plots the corrected bandstructure on a symmetrized kpath obtained with zpr_analyser.py
 
@@ -323,6 +323,9 @@ class ZPR_plotter(object):
     crit_pressure = None
     crit_pressure2 = None
     explicit_pressures = None
+    valence = None
+    spline = False
+    spline_factor = 5
     
     gap_loc0 = None
     gap_energy0 = None
@@ -372,6 +375,7 @@ class ZPR_plotter(object):
     gap = False
     pgap = False
     te_pgap = False
+    total_pgap = False
     vbcb = False
     separate_bands = False
     phase_diagram = False
@@ -419,12 +423,15 @@ class ZPR_plotter(object):
             main_title = None,
             title = None,
             savefile = None,
+            spline_factor = 5,
+            spline = False,
 
             gap_loc0 = None,
             gap_energy0 = None,
             gap_loc = None,
             gap_energy = None,
             gap_ren = None,
+            valence = None,
 
 
             omega_se = None,
@@ -441,6 +448,7 @@ class ZPR_plotter(object):
             vbcb = False,
             pgap = False,
             te_pgap = False,
+            total_pgap = False,
             separate_bands = False,
             phase_diagram = False,
             split = False,
@@ -529,6 +537,9 @@ class ZPR_plotter(object):
         self.pressure = pressure
         self.crit_pressure = crit_pressure
         self.crit_pressure2 = crit_pressure2
+        self.valence = valence
+        self.spline = spline
+        self.spline_factor = spline_factor
 
         self.verbose = verbose
         self.zero_gap_value = zero_gap_value 
@@ -543,6 +554,7 @@ class ZPR_plotter(object):
         self.vbcb = vbcb
         self.pgap = pgap
         self.te_pgap = te_pgap
+        self.total_pgap = total_pgap
         self.separate_bands = separate_bands
         self.phase_diagram = phase_diagram
         self.split = split
@@ -688,7 +700,6 @@ class ZPR_plotter(object):
 
 
             if self.spline:
-                from scipy.interpolate import interp1d
 
                 nband = len(self.bands_to_print)
 
@@ -4093,10 +4104,10 @@ class ZPR_plotter(object):
         legend2_handles=[]
         legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
         legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
-        legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1,borderpad=0.2)
-        _arr[0][0].add_artist(legend2)
+        legend2 = _arr[2][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,0.28),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1,borderpad=0.2)
+        _arr[2][0].add_artist(legend2)
 
-#        fig.subplots_adjust(hspace=0.0,top=0.90,right=0.95)
+        fig.subplots_adjust(hspace=0.0,top=0.90,right=0.95)
 
         if self.split:
             fig.align_ylabels()
@@ -4107,6 +4118,1867 @@ class ZPR_plotter(object):
             self.save_figure(fig)
 
         #plt.show()
+
+    def plot_te_pgap_indirect(self):
+
+
+        file_qty = len(self.te_fnames)
+
+        # Define figure
+        only=True  # only the Egap(P) for each T. If False, add gap renorm on top subplot
+
+        if only:
+            fig, _arr = plt.subplots(1,1, figsize=self.figsize, squeeze=False, sharex=True)
+        else:
+            fig, _arr = plt.subplots(2,1, figsize=self.figsize, squeeze=False, sharex=True)
+        #plt.subplots_adjust(hspace=0.05, top=0.95) 
+
+        if self.split:
+            raise Exception('split not yet implemented for te_pgap')
+            if only:
+                fig2, _arr2 = plt.subplots(1,1, figsize=self.figsize, squeeze=False, sharex=True)
+            else:
+                fig2, _arr2 = plt.subplots(2,1, figsize=self.figsize, squeeze=False, sharex=True)
+          #  plt.subplots_adjust(hspace=0.05, top=0.95) 
+
+
+        # Read explicit data, if required
+        if self.gap_fname is not None:
+
+            self.exgap = GAPfile(self.gap_fname, read=False)
+            self.read_other_file()
+
+            
+            if self.exgap.explicit_gap_energies_units == 'eV':
+                self.explicit_gap_energies = self.exgap.explicit_gap_energies*1000
+            else:
+                self.explicit_gap_energies = self.exgap.explicit_gap_energies
+
+#            else:
+#                self.explicit_gap_energies = self.exgap.explicit_gap_energies
+
+            self.explicit_pressures = self.exgap.explicit_pressures
+
+#            if len(self.explicit_gap_energies) != file_qty:
+#                raise Exception('gap_fname must have the same number of pressures as zpr data')
+
+#            _arr[1][0].plot(self.explicit_pressures, self.explicit_gap_energies, 'k', marker = '*', label='unperturbed (explicit)') 
+
+            
+
+        # Read and treat all input files
+        for ifile, te_file in enumerate(self.te_fnames):
+                
+            # Define file class
+            self.te = TEfile(te_file, read=False)
+
+            # Read input file
+            self.read_file()
+
+            # Set parameters for this file
+            self.nsppol = self.te.nsppol
+            self.nkpt = self.te.nkpt
+            self.max_band = self.te.max_band
+            self.ntemp = self.te.ntemp
+            self.temp = self.te.temp
+            self.kpoints = self.te.kpoints
+            
+            #self.gridsize = self.te.gridsize
+            self.gap_units = self.te.gap_energy_units
+
+            input_units = self.te.gap_energy_units
+            
+            if input_units == self.units:
+                pass
+            else:
+                if self.units == 'eV':
+                    self.eig0 = self.te.eig0*cst.ha_to_ev
+                    self.eigcorr = self.te.eigcorr*cst.ha_to_ev
+                if self.units == 'meV':
+                    self.eig0 = self.te.eig0*cst.ha_to_ev*1000
+                    self.eigcorr = self.te.eigcorr*cst.ha_to_ev*1000
+
+
+            if self.split :
+                self.energy0 = self.te.unperturbed_indirect_gap_energy_split
+                self.loc0 = self.te.unperturbed_indirect_gap_location_split
+                self.gap_location = self.te.indirect_gap_location_split
+                self.gap_energy = self.te.indirect_gap_energy_split
+                self.gap_ren = self.te.indirect_gap_ren_split
+                self.band_energy = self.te.indirect_gap_energy_band_split
+
+                if self.unpert:
+                    gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
+                    for a in range(2):
+                        gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
+                        gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
+
+            elif self.split2:
+                if self.pressure[ifile] > self.crit_pressure:
+                    side = 1    
+                else:
+                    side = 0     
+
+                self.energy0 = self.te.unperturbed_indirect_gap_energy_split
+                self.loc0 = self.te.unperturbed_indirect_gap_location_split
+                self.gap_location = self.te.indirect_gap_location_split
+                self.gap_energy = self.te.indirect_gap_energy_split
+                self.gap_ren = self.te.indirect_gap_ren_split
+                self.band_energy = self.te.indirect_gap_energy_band_split
+
+                if self.unpert:
+                    gap_index0 = np.zeros((2,2),dtype = int) # (vbcb, lr)
+                    for a in range(2):
+                        gap_index0[0,a] = self.find_gap_index(self.loc0[a,0])
+                        gap_index0[1,a] = self.find_gap_index(self.loc0[a,1])
+
+ 
+
+            else:
+                self.energy0 = self.te.unperturbed_indirect_gap_energy
+                self.loc0 = self.te.unperturbed_indirect_gap_location
+                self.gap_location = self.te.indirect_gap_location
+                self.gap_energy = self.te.indirect_gap_energy
+                self.gap_ren = self.te.indirect_gap_ren
+
+                if self.unpert:
+                    gap_index0 = np.zeros((2),dtype = int)
+                    gap_index0[0] = self.find_gap_index(self.loc0[0])
+                    gap_index0[1] = self.find_gap_index(self.loc0[1])
+
+            # Initialize full arrays
+            if ifile==0:
+                if self.split:
+                    self.full_gap_energy = np.zeros((file_qty, self.ntemp,2))
+                    self.full_gap_ren = np.zeros((file_qty, self.ntemp,2))
+                    self.ref_temp = self.temp
+                    self.full_energy0 = np.zeros((len(self.explicit_pressures),2))
+
+                if self.split2: # single array, left gap for trovoal phase and right gap for topol phase
+                    self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+                    self.full_gap_energy = np.zeros((file_qty, self.ntemp))
+                    self.ref_temp = self.temp
+                    self.full_energy0 = np.zeros((file_qty))
+
+                else:
+                    self.full_gap_energy = np.zeros((file_qty, self.ntemp))
+                    self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+                    self.ref_temp = self.temp
+                    self.full_energy0 = np.zeros((file_qty))
+            else:
+                if np.array_equal(self.temp,self.ref_temp) == False:
+                    raise Exception('All files must have the same temperature array! Please correct file #{}.'.format(ifile+1))
+
+            if self.ntemp > len(self.color):
+                raise Exception('Color vector is not long enough! Please provide {} color list.'.format(self.ntemp))
+
+#            print(self.gap_energy)
+            if self.split:
+                self.full_gap_energy[ifile,:,:] = self.gap_energy
+                self.full_gap_ren[ifile,:,:] = self.gap_ren
+                if not self.gap_fname:
+                    self.full_energy0[ifile,:] = self.energy0
+                else:
+                    # find P in explicit pressures array
+                    p_index = self.find_pressure_index(self.pressure[ifile])
+                    self.full_energy0[ifile,:] = self.explicit_gap_energies[p_index]
+
+            if self.split2:
+                self.full_gap_ren[ifile,:] = self.gap_ren[:,side]
+                self.full_gap_energy[ifile,:] = self.gap_energy[:,side]
+                print(self.gap_fname)
+                if not self.gap_fname:
+                    self.full_energy0[ifile] = self.energy0[ifile,side]
+                else:
+                    # find P in explicit pressures array
+                    p_index = self.find_pressure_index(self.pressure[ifile])
+                    self.full_energy0[ifile] = self.explicit_gap_energies[p_index]
+            else:
+                self.full_gap_energy[ifile,:] = self.gap_energy
+                self.full_gap_ren[ifile,:] = self.gap_ren
+                if not self.gap_fname:
+                    self.full_energy0[ifile] = self.energy0
+                else:
+                    p_index = self.find_pressure_index(self.pressure[ifile])
+                    print(p_index)
+                    self.full_energy0[ifile] = self.explicit_gap_energies[p_index]
+
+            if self.gap_fname is not None:
+                if self.split:
+                    for a in range(2):
+                #        self.full_energy0[ifile,a] = self.explicit_gap_energies[ifile]
+                        self.full_gap_energy[ifile,:,a] =  self.full_gap_ren[ifile,:,a] + np.ones(self.ntemp)*self.full_energy0[ifile,a]
+                elif self.split2:
+                    self.full_gap_energy[ifile,:] = self.full_gap_ren[ifile,:] + np.ones(self.ntemp)*self.full_energy0[ifile]
+                else:
+                 #   self.full_energy0[ifile] = self.explicit_gap_energies[ifile]
+                    self.full_gap_energy[ifile,:] =  self.full_gap_ren[ifile,:] + np.ones(self.ntemp)*self.full_energy0[ifile]
+
+
+        if self.crit_pressure is not None:
+            crit_index = self.find_temp_index()
+            if self.gap_fname is not None:
+                crit_index2 = self.find_temp_index2(self.explicit_pressures)
+                print('crit_index2',crit_index2)
+        else:
+            crit_index = None
+
+
+        if self.follow:
+            self.full_energy0[-1,:] = -self.full_energy0[-1,:]
+            self.full_gap_energy[-1,:,:] = -self.full_gap_energy[-1,:,:]
+
+    # Extrapolate behavior linearly towards TPT... it IS a bit sketchy.
+        pressure1 = np.arange(1.5,2.0,0.1)
+        tmparr = np.arange(2.1,2.6,0.1) # change 2.2 to 2.6 foir full BZ
+        pressure2 = np.arange(2.3,3.0,0.1)
+        tmparr2 = np.arange(2.0,2.3,0.1)
+#        self.extr_pressure2 = np.arange(2.3, 3.0, 0.1)
+
+        # linearize unperturbed gap energy to extrapolate inside WSM phase
+        y0,y1 = np.polyfit(self.explicit_pressures[15:20], self.explicit_gap_energies[15:20],1)
+        tmp2 = y1 + tmparr*y0
+        self.extr_pressure1 = np.concatenate((pressure1, tmparr))
+
+        y0,y1 = np.polyfit(self.explicit_pressures[21:29], self.explicit_gap_energies[21:29],1)
+        tmp22 = y1 + tmparr2*y0
+        self.extr_pressure2 = np.concatenate((pressure2,tmparr2))
+
+        self.extr_full_gap_ren1 = np.zeros((len(self.extr_pressure1), self.ntemp))
+        self.extr_full_gap_ren2 = np.zeros((len(self.extr_pressure2), self.ntemp))
+        self.extr_full_gap_energy1 = np.zeros((len(self.extr_pressure1), self.ntemp))
+        self.extr_full_gap_energy2 = np.zeros((len(self.extr_pressure2), self.ntemp))
+        extr_energy01 = np.zeros((len(pressure1)))
+        extr_energy02 = np.zeros((len(pressure2)))
+#        self.extr_full_energy02 = np.zeros((len(self.extr_pressure2)))
+
+        # Get full_gap_energy0 (explicit bare gap energies) from explicit data
+        for p, pres in enumerate(pressure1):
+            ind = self.find_pressure_index(pres)
+            extr_energy01[p] = self.explicit_gap_energies[ind]
+
+        self.extr_full_energy01 = np.concatenate((extr_energy01,tmp2))
+
+        for p, pres in enumerate(pressure2):
+            ind = self.find_pressure_index(pres)
+            extr_energy02[p] = self.explicit_gap_energies[ind]
+
+        self.extr_full_energy02 = np.concatenate((extr_energy02,tmp22))
+
+        #Store extrapolated phase boundaries (T)
+        self.pc1 = np.zeros((self.ntemp))
+        self.pc2 = np.zeros((self.ntemp))
+
+        for T in range(self.ntemp):
+
+            if self.split:
+                #trivial side
+                x0,x1 = np.polyfit(self.pressure[0:crit_index+1], self.full_gap_ren[0:crit_index+1,T,0], 1)
+                self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
+                self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
+
+                # topol side
+                x0,x1 =  np.polyfit(self.pressure[crit_index+1:], self.full_gap_ren[crit_index+1:,T,0], 1)
+                self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
+                self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
+
+            elif self.split2:
+                #trivial side
+                x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_gap_ren[crit_index-1:crit_index+1,T], 1)
+                self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
+                self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
+
+                # topol side
+                x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_gap_ren[crit_index+1:crit_index+3,T], 1)
+                self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
+                self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
+
+
+            else:
+                #trivial side
+                x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_gap_ren[crit_index-1:crit_index+1,T], 1)
+                print('For T={} K:'.format(self.temp[T]))
+                self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
+                self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
+                x0,x1 = np.polyfit(self.extr_pressure1,self.extr_full_gap_energy1[:,T],1)
+                print('trivial side : {} GPa'.format(-x1/x0))
+                self.pc1[T] = -x1/x0
+                # topol side
+                x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_gap_ren[crit_index+1:crit_index+3,T], 1)
+                self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
+                self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
+                x0,x1 = np.polyfit(self.extr_pressure2,self.extr_full_gap_energy2[:,T],1)
+                print('topol side : {} GPa'.format(-x1/x0))
+                self.pc2[T] = -x1/x0
+
+#        print(self.extr_pressure1)
+#        print(self.extr_full_gap_energy1)
+#        print(self.extr_pressure2)
+#        print(self.extr_full_gap_energy2)
+
+        for T in range(self.ntemp):
+            if crit_index is not None:
+                s = crit_index+1
+
+                if self.split:
+                    # figure 1
+                    if T==self.temp[0]:
+                        ###### FIX ME : keep explicit_pressures and explicit_gap_energies, just get a new crit index for this array! 
+                        if self.gap_fname is not None:
+#                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='Static T=0')
+                            if self.crit_index2 is not None:
+                                if only:
+                                    _arr[0][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
+
+                            else:
+                                if only:
+                                    _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='Static T=0')
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='Static T=0')
+
+                        else:
+                            if only:
+                                _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='Static T=0')
+                            else:
+                                _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='Static T=0')
+                    else:
+                        if only:
+                            _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
+                        else:
+                            _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
+    
+                    if only:
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,0], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    else:
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T,0], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+        #                self.set_legend_gap(_arr[0][0])
+                        _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,0], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                #        _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='o', color='black', label='interpolated')
+    
+                    # extrapolated data
+                    if only:
+                        _arr[0,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                    else:
+                        _arr[0,0].plot(self.extr_pressure1[:-2], self.extr_full_gap_ren1[:-2,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+
+    ##-------------------------------------- passed TPT
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.30), ncol = (self.ntemp+1), fontsize=12)
+                    if only:
+                        handles, labels = _arr[0,0].get_legend_handles_labels()
+                        _arr[0][0].legend(self.flip(handles, 4), self.flip(labels, 4), loc='lower center', bbox_to_anchor=(0.5,-0.50), ncol=4, fontsize=20, numpoints=1)
+                    else:
+                        handles, labels = _arr[1,0].get_legend_handles_labels()
+                        _arr[1][0].legend(self.flip(handles, 4), self.flip(labels, 4), loc='lower center', bbox_to_anchor=(0.5,-0.50), ncol=4, fontsize=20, numpoints=1)
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.30), ncol = (self.ntemp+1), fontsize=22)
+
+#                    _arr[1][0].legend(numpoints = 1, loc = 'center right', bbox_to_anchor=(1.27,1.62), ncol = 1, fontsize=22)
+
+            #        self.set_legend_pgap(_arr2[0][0])
+    #                _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', linewidth=2.0, color=self.color[T], label=self.ref_temp[T])
+                    if T==self.temp[0]:
+                        if self.gap_fname is not None:
+#
+                            if crit_index2 is not None:
+                                if only:
+                                    _arr[0][0].plot(self.explicit_pressures[crit_index2+2,:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='Static T=0')
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+2:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='Static T=0')
+
+                    if only:
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,0], marker='o', linewidth=2.0, color=self.color[T])
+                    else:
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,0], marker='o', linewidth=2.0, color=self.color[T])
+                        _arr[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,0], marker='o', linewidth=2.0, color=self.color[T])
+
+                    if only:
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                    else:
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+
+                    if self.gap_fname is not None:
+                        x=1
+                        #_arr[1][0].plot(self.explicit_pressures[s:], self.explicit_gap_energies[s:],marker='d', color='black')
+                    else:
+                        if only:
+                            _arr[0][0].plot(self.pressure[s:], self.full_energy0[s:,0],marker='o', color='black')
+                        else:
+                            _arr[1][0].plot(self.pressure[s:], self.full_energy0[s:,0],marker='o', color='black')
+             #       _arr2[0][0].plot(self.pressure[s:], self.full_energy0[s:],marker='o', color='black')
+
+                    # figure 2
+                    if T==self.temp[0]:
+                        if self.gap_fname is not None:
+                            if only:
+                                _arr2[0][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
+                            else:
+                                arr2[1][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
+                        else:
+                            if only:
+                                _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
+                            else:
+                                _arr2[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
+                    else:
+                        if only:
+                            _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black')
+                        else:
+                            _arr2[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black')
+    
+                    if only:
+                        _arr2[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,1], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    else:
+                        _arr2[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T,1], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+        #                self.set_legend_gap(_arr2[0][0])
+                        _arr2[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,1], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                #        _arr22[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='d', color='black', label='interpolated')
+
+                    if only:
+                        _arr2[0][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp+1, fontsize=14)
+                    else:
+                        _arr2[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp+1, fontsize=14)
+   
+            #        self.set_legend_pgap(_arr22[0][0])
+    #                _arr2[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', linewidth=2.0, color=self.color[T], label=self.ref_temp[T])
+                    if only:
+                        _arr2[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,1], marker='o', linewidth=2.0, color=self.color[T])
+                    else:
+                        _arr2[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,1], marker='o', linewidth=2.0, color=self.color[T])
+                        _arr2[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,1], marker='o', linewidth=2.0, color=self.color[T])
+
+                    if self.gap_fname is not None:
+                        if only:
+                            _arr2[0][0].plot(self.explicit_pressures[s:], self.full_energy0[s:,1],marker='d', color='black')
+                        else:
+                            _arr2[1][0].plot(self.explicit_pressures[s:], self.full_energy0[s:,1],marker='d', color='black')
+                    else:
+                        if only:
+                            _arr2[0][0].plot(self.pressure[s:], self.full_energy0[s:,1],marker='d', color='black')
+                        else:
+                            _arr2[1][0].plot(self.pressure[s:], self.full_energy0[s:,1],marker='d', color='black')
+             #       _arr22[0][0].plot(self.pressure[s:], self.full_energy0[s:],marker='d', color='black')
+
+#########################################
+       #-------- crit_index but no split or split2
+                else:
+                    if T==self.temp[0]:
+                        ###### FIX ME : keep explicit_pressures and explicit_gap_energies, just get a new crit index for this array! 
+                        if self.gap_fname is not None:
+#                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='Static T=0')
+                            if crit_index2 is not None:
+                                if only:
+                                     _arr[0][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=7, color='black', label='Static T=0')
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=7, color='black', label='Static T=0')
+                            else:
+                                if only:
+                                     _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', markersize=7,color='black', label='Static T=0')
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d',markersize=7, color='black', label='Static T=0')
+
+                        else:
+                            if only:
+                                _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black', label='Static T=0')
+                            else:
+                                _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black', label='Static T=0')
+#                    else:
+#                        _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
+    
+                    if only:
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=7, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    else:
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d',markersize=7, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+        #                self.set_legend_gap(_arr[0][0])
+                        _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=7, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                #        _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='o', color='black', label='interpolated')
+
+    #                if only:
+    #                    _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+    #                else:
+    #                    _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+    #    #                self.set_legend_gap(_arr[0][0])
+    #                    _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+    #            #        _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='o', color='black', label='interpolated')
+    
+                    # extrapolated data
+                    if only:
+                        _arr[0,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                    else:
+                        _arr[0,0].plot(self.extr_pressure1[:-2], self.extr_full_gap_ren1[:-2,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+
+    ##-------------------------------------- passed TPT
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.30), ncol = (self.ntemp+1), fontsize=12)
+                    if only:
+                        handles, labels = _arr[0,0].get_legend_handles_labels()
+                        _arr[0][0].legend(self.flip(handles, 4), self.flip(labels, 4), loc='lower center', bbox_to_anchor=(0.5,-0.50), ncol=4, fontsize=20, numpoints=1)
+                    else:
+                        handles, labels = _arr[1,0].get_legend_handles_labels()
+                        _arr[1][0].legend(self.flip(handles, 4), self.flip(labels, 4), loc='lower center', bbox_to_anchor=(0.5,-0.50), ncol=4, fontsize=20, numpoints=1)
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.30), ncol = (self.ntemp+1), fontsize=22)
+
+#                    _arr[1][0].legend(numpoints = 1, loc = 'center right', bbox_to_anchor=(1.27,1.62), ncol = 1, fontsize=22)
+
+            #        self.set_legend_pgap(_arr2[0][0])
+    #                _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', linewidth=2.0, color=self.color[T], label=self.ref_temp[T])
+                    if T==self.temp[0]:
+                        if self.gap_fname is not None:
+#
+                            if crit_index2 is not None:
+                                if only:
+                                     _arr[0][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=7, color='black', label=None)
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=7, color='black', label=None)
+
+                    if only:
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+                    else:
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
+                        _arr[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
+
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+
+                    if self.gap_fname is not None:
+                        pass
+                        #_arr[1][0].plot(self.explicit_pressures[s:], self.explicit_gap_energies[s:],marker='d', color='black')
+                    else:
+                        if only:
+                            _arr[0][0].plot(self.pressure[s:], self.full_energy0[s:,0],marker='o', color='black')
+                        else:
+                            _arr[1][0].plot(self.pressure[s:], self.full_energy0[s:,0],marker='o', color='black')
+             #       _arr2[0][0].plot(self.pressure[s:], self.full_energy0[s:],marker='o', color='black')
+
+
+            #---------------------- No crit_index
+            else:
+
+                if only:
+                    raise Exception('Only keyword not implemented yet without critical pressure index')
+                if self.split:
+                    # figure 1
+                    _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+                    #_arr[1][0].plot(self.pressure, self.full_energy0,marker='d', color='black')
+
+                    #figure 2
+                    _arr2[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr2[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr2[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+                    #_arr2[1][0].plot(self.pressure, self.full_energy0,marker='d', color='black')
+
+                else:
+                    _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+                    #_arr[1][0].plot(self.pressure, self.full_energy0,marker='d', color='black')
+
+        if only:
+            self.set_vrefs(_arr[0][0], self.pressure, 0.)
+            self.set_hrefs(self.ylims, _arr[0][0], self.crit_pressure,'black')
+            if self.split:
+                self.set_vrefs(_arr2[0][0], self.pressure, 0.)
+                self.set_hrefs(self.ylims, _arr2[0][0], self.crit_pressure,'black')
+
+        else:
+            for i in range(2):
+        #            if i==0 :
+                    self.set_vrefs(_arr[i][0], self.pressure, 0.)
+                    self.set_hrefs(self.ylims, _arr[i][0], self.crit_pressure,'black')
+                    if self.split:
+                        self.set_vrefs(_arr2[i][0], self.pressure, 0.)
+                        self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure,'black')
+
+        limms = [[-80.,60.],[0.,350]]
+#        limms = [[-60.,60.],[0.,80.],[-80.,40.]]
+        if self.gap_ylims is not None:
+            limms[0] = self.gap_ylims
+        if self.egap_ylims is not None:
+            limms[1] = self.egap_ylims
+
+        if only:
+            ylims = limms[1]    
+            self.set_vrefs(_arr[0][0], self.pressure, 0.)
+#            if i==0:
+            if self.crit_pressure:
+                pc1 = self.crit_pressure
+                self.set_hrefs(ylims, _arr[0][0], pc1,'gray')
+
+                if self.crit_pressure2:
+                    pc2 = self.crit_pressure2
+                    self.set_hrefs(ylims, _arr[0][0], pc2,'gray')
+                    _arr[0][0].fill([pc1,pc2,pc2,pc1],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+                else:
+                    print('No value was given for PC2')
+            else:
+                print('No value was given for PC1')
+#            self.set_hrefs(ylims, _arr[0,0], 2.18,'orange')
+#            self.set_hrefs(ylims, _arr[0,0], 2.50,'orange')
+#            _arr[0,0].fill([2.18,2.50,2.50,2.18],[ylims[0],ylims[0],ylims[1],ylims[1]],'orange',alpha=0.2)
+#            self.set_hrefs(ylims, _arr[0,0], 2.68,'magenta')
+
+
+        else:
+            for i in range(2):
+    #            lims = _arr[i,0].get_ylim() 
+    #            ylims = lims
+                ylims = limms[i]    
+                self.set_vrefs(_arr[i][0], self.pressure, 0.)
+    #            if i==0:
+                pc1 = self.crit_pressure
+                pc2 = self.crit_pressure2
+
+                self.set_hrefs(ylims, _arr[i][0], pc1,'black')
+                self.set_hrefs(ylims, _arr[i][0], pc2,'black')
+                _arr[i][0].fill([pc1,pc2,pc2,pc1],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+    #            else:
+                self.set_hrefs(ylims, _arr[i,0], 2.28,'black')
+                self.set_hrefs(ylims, _arr[i,0], 2.65,'black')
+                _arr[i,0].fill([2.28,2.65,2.65,2.28],[ylims[0],ylims[0],ylims[1],ylims[1]],'orange',alpha=0.2)
+ 
+
+        if only:
+            self.set_xaxis(_arr[0][0], self.pressure)
+            self.set_yaxis(_arr[0][0], 'Gap energy ({})'.format(self.gap_units))
+            _arr[0,0].set_ylim(limms[1])
+
+        else:
+            self.set_xaxis(_arr[1][0], self.pressure)
+            self.set_yaxis(_arr[0][0], 'Gap renormalization ({})'.format(self.gap_units))
+            self.set_yaxis(_arr[1][0], 'Gap energy ({})'.format(self.gap_units))
+
+            _arr[1,0].set_ylim(limms[1])
+
+
+#        if only:
+#            _arr[0,0].text(self.explicit_pressures[12],180, r'$\mathbf{Z_2=0}$', fontsize=24) 
+#            _arr[0,0].text(self.explicit_pressures[30],180, r'$\mathbf{Z_2=1}$', fontsize=24) 
+#
+##            _arr[0,0].text(self.explicit_pressures[5],290, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=26)
+##            _arr[0,0].text(self.explicit_pressures[38],290, r'$\frac{k_z c}{2\pi} = 0.5349$',fontsize=26)
+#
+#
+#            _arr[0,0].text(self.explicit_pressures[12],250, r'WSM 0K', fontsize=26, weight='bold', color='gray')
+#            _arr[0,0].text(self.explicit_pressures[25],250, r'WSM 300K', fontsize=26, weight='bold', color='orange')
+#
+#        else:
+#            _arr[1,0].text(self.explicit_pressures[12],180, r'$\mathbf{Z_2=0}$', fontsize=24) 
+#            _arr[1,0].text(self.explicit_pressures[30],180, r'$\mathbf{Z_2=1}$', fontsize=24) 
+#
+##            _arr[1,0].text(self.explicit_pressures[5],290, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=26)
+##            _arr[1,0].text(self.explicit_pressures[38],290, r'$\frac{k_z c}{2\pi} = 0.5349$',fontsize=26)
+#
+#
+#            _arr[1,0].text(self.explicit_pressures[12],250, r'WSM 0K', fontsize=26, weight='bold', color='gray')
+#            _arr[1,0].text(self.explicit_pressures[25],250, r'WSM 300K', fontsize=26, weight='bold', color='orange')
+
+
+
+        if self.split:
+            if only:
+                self.set_xaxis(_arr2[0][0], self.pressure)
+                self.set_yaxis(_arr2[0][0], 'Gap energy ({})'.format(self.gap_units))
+                self.set_title(_arr[0][0], self.title[0])
+
+            else:
+                self.set_xaxis(_arr2[1][0], self.pressure)
+                self.set_yaxis(_arr2[0][0], 'Gap renormalization ({})'.format(self.gap_units))
+                self.set_yaxis(_arr2[1][0], 'Gap energy ({})'.format(self.gap_units))
+
+                self.set_title(_arr[0][0], self.title[0])
+                self.set_title(_arr2[0][0], self.title[1])
+        else:
+            self.set_title(_arr[0][0], self.main_title)
+
+#        fig.subplots_adjust(hspace=0.09, bottom=0.18)
+
+#        plt.subplots_adjust(left = 0.1, bottom = 0.11, right=0.9, top = 0.93, wspace=0.2,hspace=0.07)
+        if only:
+            fig.subplots_adjust(bottom= 0.31, right = 0.94)
+        else:
+            fig.subplots_adjust(left = 0.1, bottom = 0.21, right=0.95, top = 0.95, wspace=0.2,hspace=0.07)
+
+        # Custom text
+        if only:
+            _arr[0][0].text(0.7,250, r'$\mathbb{Z}_2\!=\!0$',fontsize=24,color='k')
+            _arr[0][0].text(2.7,250, r'$\mathbb{Z}_2\!=\!1$',fontsize=24,color='k')
+            _arr[0][0].text(1.90,200,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
+            _arr[0][0].text(1.50,210,r'Static',fontsize=20,color='#5A5A5A',weight='bold')
+            _arr[0][0].text(1.50,190,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
+
+            legend_handles = []
+            legend_handles.append(Line2D([0],[0],color='k',linewidth=1.5,label=r'0 K Static'))
+            for t,T in enumerate(self.ref_temp):
+                legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5,label=r'{:>3.0f} K'.format(T)))
+
+            legend1 = _arr[0][0].legend(handles=legend_handles, loc=9, bbox_to_anchor=(0.5,1.15),fontsize=20,handletextpad=0.4,handlelength=1.4,frameon=True,ncol=len(self.ref_temp)+1,columnspacing=1)
+            _arr[0][0].add_artist(legend1)
+
+            legend2_handles = []
+            legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
+            legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
+            legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol=1,labelspacing=0.1,borderpad=0.2)
+            _arr[0][0].add_artist(legend2)
+
+        else:
+            print('Complete legend not implemented yet')
+
+
+#        plt.show()
+#        plt.subplots_adjust(hspace=0.05, top=0.95) 
+
+        if self.split:
+            fig.align_ylabels()
+            fig2.align_ylabels()
+            self.save_figure_split(fig,fig2)
+        else:
+            fig.align_ylabels()
+            self.save_figure(fig)
+
+
+    def plot_total_pgap_separate_indirect(self):
+
+        if not self.zpr_fnames and self.te_fnames:
+            raise Exception('For total pgap, both te_fnames and zpr_fnames must be provided')
+        if not self.valence:
+            raise Exception('For total pgap, must provide valence band index (index starting at 1)')
+
+        file_qty = len(self.zpr_fnames)
+
+        if len(self.te_fnames) != file_qty:
+            raise Exception('zpr_fnames and te_fnames must contain the same number of files, but zpr_fnames has {} and te_fnames has {}.'.format(file_qty, len(te_fnames)))
+
+        # Define figure
+        fig, _arr = plt.subplots(3,1, figsize=self.figsize, squeeze=False, sharex=True)
+#        plt.subplots_adjust(hspace=0.05, top=0.95) 
+
+        if self.split:
+            raise Exception('split not yet implemented for total_pgap')
+            fig2, _arr2 = plt.subplots(3,1, figsize=self.figsize, squeeze=False, sharex=True)
+            plt.subplots_adjust(hspace=0.05, top=0.95) 
+
+        if not self.band_numbers:
+            raise Exception('Must provide valence and conduction band numbers vis band_numbers')
+
+
+        # Read and treat all input files
+        for ifile in range(file_qty):
+                
+            # Define file class
+            zpr_file = ZPRfile(self.zpr_fnames[ifile], read=False)
+            zpr_file.read_nc()
+            te_file = TEfile(self.te_fnames[ifile], read=False)
+            te_file.read_nc()
+
+
+            # Set parameters for this file
+            self.nsppol = zpr_file.nsppol
+            self.nkpt = zpr_file.nkpt
+            self.max_band = te_file.max_band
+            self.ntemp = zpr_file.ntemp
+            self.temp = zpr_file.temp
+            self.kpoints = zpr_file.kpoints
+            if self.units == 'eV':
+                self.eig0 = zpr_file.eig0*cst.ha_to_ev
+                zpr_file.correction = zpr_file.correction*cst.ha_to_ev
+            elif self.units == 'meV':
+                self.eig0 = zpr_file.eig0*cst.ha_to_ev*1000
+                zpr_file.correction = zpr_file.correction*cst.ha_to_ev*1E3
+
+            # Checkups, put in a separate function...
+            if te_file.nsppol != self.nsppol:
+                raise Exception('zpr and te files (index {}) do not have the same nsppol.'.format(ifile))
+            if te_file.nkpt != self.nkpt:
+                raise Exception('zpr and te files (index {}) do not have the same nkpt.'.format(ifile))
+            if zpr_file.max_band != self.max_band:
+                zpr_max_band = zpr_file.max_band
+            else:
+                zpr_max_band = None
+                raise Exception('zpr and te files (index {}) do not have the same max_band.'.format(ifile))
+            if te_file.ntemp != self.ntemp:
+                raise Exception('zpr and te files (index {}) do not have the same ntemp.'.format(ifile))
+            if not np.array_equal(te_file.temp, self.temp):
+                raise Exception('zpr and te files (index {}) do not have the same temperature array.'.format(ifile))
+            if not np.array_equal(te_file.kpoints,self.kpoints):
+                raise Exception('zpr and te files (index {}) do not have the same kpoint array.'.format(ifile))
+            if not np.allclose(te_file.eig0, self.eig0[0,:,:self.max_band]):
+                raise Exception('zpr and te files (index {}) do not have the same bare eigenvalues.'.format(ifile))
+
+
+           ############################################### 
+#            self.gridsize = self.zpr.gridsize
+            self.gap_units = zpr_file.gap_energy_units
+
+            input_units = te_file.gap_energy_units
+
+            if input_units == self.units:
+                pass
+            else:
+                if self.units == 'eV':
+                    if input_units == 'Hartree':
+                        te_file.eig0 = te_file.eig0*cst.ha_to_ev
+                        te_file.correction = te_file.correction*cst.ha_to_ev
+                    elif input_units == 'meV':
+                         te_file.eig0 = te_file.eig0*1E-3
+                         te_file.correction = te_file.correction*1E-3
+                    else:
+                        raise Exception('What kind of energy units are you using?!?')
+                if self.units == 'meV':
+                    if input_units == 'Hartree':
+                        te_file.eig0 = te_file.eig0*cst.ha_to_ev*1000
+                        te_file.correction = te_file.correction*cst.ha_to_ev*1000
+                    elif input_units == 'eV':
+                        te_file.eig0 = te_file.eig0*1E3
+                        te_file.correction = te_file.correction*1E3
+                    else:
+                        raise Exception('What kind of energy units are you using?!?')
+
+            # Set side of phase transition for split2 option
+            if self.split2:
+                if self.pressure[ifile] < self.crit_pressure:
+                    side=0
+                else:
+                    side=1
+
+            # Retrieve data from files
+            self.correction = np.zeros((self.nsppol,self.nkpt, self.max_band, self.ntemp))
+            self.eigcorr = np.zeros((self.nsppol,self.nkpt, self.max_band, self.ntemp))
+
+            for t in range(self.ntemp):
+                if self.max_band is not None:
+                    self.correction[:,:,:,t] = te_file.correction[:,:,:,t] + zpr_file.correction[:,:,:self.max_band,t]
+                    self.eigcorr[:,:,:,t] = self.eig0[:,:,:self.max_band] + self.correction[:,:,:,t]
+                else:
+                    self.correction = te_file.correction + zpr_file.correction
+                    self.eigcorr = self.eig0 + self.correction
+            
+            # Initialize plotting arrays
+            if ifile==0:
+                if self.split: # distinct data for left and rifht gap
+                    self.full_gap_ren = np.zeros((file_qty, self.ntemp,2))
+                    self.full_band_ren = np.zeros((file_qty,self.ntemp,2,2)) # file, temp, vbcb, lr 
+                    self.ref_temp = self.temp
+                if self.split2: # single array, left gap for trovoal phase and right gap for topol phase
+                    self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+                    self.full_band_ren = np.zeros((file_qty,self.ntemp,2))
+                    self.ref_temp = self.temp
+                else:
+                    self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+                    self.full_gap_ren_band = np.zeros((file_qty,self.ntemp,2))
+                    self.full_gap_loc = np.zeros((file_qty, self.ntemp+1,2))
+                    self.full_gap_energy = np.zeros((file_qty, self.ntemp+1))
+                    self.full_gap_energy_band = np.zeros((file_qty, self.ntemp+1,2))
+                    self.ref_temp = self.temp
+            else:
+                if np.array_equal(self.temp,self.ref_temp) == False:
+                    raise Exception('All files must have the same temperature array! Please correct file #{}.'.format(ifile+1))
+
+            if self.ntemp > len(self.color):
+                raise Exception('Color vector is not long enough! Please provide {} color list.'.format(self.ntemp))
+
+#            if self.split:
+#                self.full_gap_ren[ifile,:,:] = self.gap_ren
+#     #           print(np.shape(self.gap_ren))
+#     #           print(np.shape(self.full_gap_ren))
+#            if self.split2:
+#                self.full_gap_ren[ifile,:] = self.gap_ren[:,side]
+#            else:
+#
+#                self.full_gap_ren[ifile,:] = self.gap_ren
+
+            if self.split:
+                raise Exception('Split not ready yet! How come did you get this far?!?')
+
+            if self.indirect:
+                self.full_gap_loc[ifile,:,:], self.full_gap_energy[ifile,:], self.full_gap_ren[ifile,:], self.full_gap_energy_band[ifile,:,:],self.full_gap_ren_band[ifile,:,:] = self.get_indirect_gap_info(self.eig0, self.eigcorr,False)
+            else:
+                raise Exception('Direct gap not yet implemented, get to work!')
+
+        print(self.full_gap_ren_band[:,-1,0])
+        print(self.full_gap_ren_band[:,-1,1])
+        print(self.full_gap_ren[:,-1])
+
+        if self.crit_pressure is not None:
+            crit_index = self.find_temp_index()
+        else:
+            crit_index = None
+
+        for T in range(self.ntemp):
+
+            if crit_index is not None:
+                s = crit_index+1
+
+                if self.split:
+                    #figure1
+                    _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren_band[0:s,T,1,0], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].plot(self.pressure[0:s], self.full_gap_ren_band[0:s,T,0,0], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T,0], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+
+                    _arr[2][0].legend(numpoints = 1, loc = 'center right', bbox_to_anchor=(1.27,1.62), ncol = 1, fontsize=20)
+
+                  #  self.set_legend_pgap2(_arr[2][0])
+                    _arr[0][0].plot(self.pressure[s:], self.full_gap_ren_band[s:,T,1,0], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+                    _arr[1][0].plot(self.pressure[s:], self.full_gap_ren_band[s:,T,0,0], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,0], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+
+                    #figure2
+                    _arr2[0][0].plot(self.pressure[0:s], self.full_gap_ren_band[0:s,T,1,1], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr2[1][0].plot(self.pressure[0:s], self.full_gap_ren_band[0:s,T,0,1], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr2[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T,1], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+
+                    self.set_legend_pgap2(_arr2[2][0])
+                    _arr2[0][0].plot(self.pressure[s:], self.full_gap_ren_band[s:,T,1,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+                    _arr2[1][0].plot(self.pressure[s:], self.full_gap_ren_band[s:,T,0,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+                    _arr2[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+
+                else:
+                    _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren_band[0:s,T,1], marker='d', markersize=7, linewidth=1.5, color=self.color[T], label=r'{} K'.format(self.ref_temp[T]))
+                    _arr[1][0].plot(self.pressure[0:s], self.full_gap_ren_band[0:s,T,0], marker='d', markersize=7, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d', markersize=7, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+
+                  #  _arr[2][0].legend(numpoints=1, loc= 'center right', bbox_to_anchor=(1.27,1.62), ncol=1, fontsize=20)
+
+                    _arr[0][0].plot(self.pressure[s:], self.full_gap_ren_band[s:,T,1], marker='o', markersize=7, linewidth=1.5, color=self.color[T])
+                    _arr[1][0].plot(self.pressure[s:], self.full_gap_ren_band[s:,T,0], marker='o', markersize=7, linewidth=1.5, color=self.color[T])
+                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=7, linewidth=1.5, color=self.color[T])
+
+
+            else:
+                if self.split:
+                    _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+                    _arr[1][0].legend(numpoints = 1, loc = 'center right', bbox_to_anchor=(1.02,1.0), ncol = 1, fontsize=26)
+
+
+#                    _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#                    _arr[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+
+                else:
+                    _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='d', linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+
+
+        limms = [[-50.,50.],[-2.,50.],[-90.,40.]]
+##########FIX ME : add default data and if condition
+        if self.cond_ylims is not None:
+            limms[0] = self.cond_ylims
+        if self.val_ylims is not None:
+            limms[1] = self.val_ylims
+        if self.gap_ylims is not None:
+            limms[2] = self.gap_ylims
+
+        for i in range(3):
+#            lims = _arr[i,0].get_ylim() 
+            ylims = limms[i]    
+            _arr[i,0].set_ylim(limms[i])
+            self.set_vrefs(_arr[i][0], self.pressure, 0.,style='dashed')
+            if self.crit_pressure:
+                pc1 = self.crit_pressure
+                self.set_hrefs(ylims, _arr[i][0], self.crit_pressure,'gray')
+                if self.crit_pressure2:
+                    pc2 = self.crit_pressure2
+                    self.set_hrefs(ylims, _arr[i][0], self.crit_pressure+0.2,'gray')
+                    _arr[i][0].fill([pc1,pc2,pc2,pc1],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+                else:
+                    print('No value provided for PC2')
+            else:
+                print('No value provided for PC1')
+
+
+            if self.split:
+                self.set_vrefs(_arr2[i][0], self.pressure, 0.)
+                self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure,'gray')
+                self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure+0.2,'gray')
+                lims = _arr[i,0].get_ylim() 
+                _arr2[i][0].fill([2.08,2.28,2.28,2.08],[lims[0]-5,lims[0]-5,lims[1]+5,lims[1]+5],'gray',alpha=0.2)
+
+
+        
+        self.set_xaxis(_arr[2][0], self.pressure)
+        self.set_yaxis_separate(_arr[0][0], 'CB ren ({})'.format(self.gap_units),self.cond_ylims, self.cond_yticks)
+        self.set_yaxis_separate(_arr[1][0], 'VB ren ({})'.format(self.gap_units),self.val_ylims, self.val_yticks)
+        self.set_yaxis_separate(_arr[2][0], 'Gap ren ({})'.format(self.gap_units),self.gap_ylims, self.gap_yticks)
+
+
+        self.set_yaxis(_arr[0][0], 'CB ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr[1][0], 'VB ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr[2][0], 'Gap ren ({})'.format(self.gap_units))
+
+#        if self.main_title:
+#            self.set_title(_arr[0][0], self.main_title)
+
+        fig.subplots_adjust(left=0.11,bottom=0.08,right=0.81,top=0.95,wspace=0.2,hspace=0.12)
+
+        #_arr[1,0].text(self.explicit_pressures[8],300, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=30)
+        #_arr[1,0].text(self.explicit_pressures[35],300, r'$\frac{k_z c}{2\pi} = 0.5349$',fontsize=30)
+
+        #_arr[1,0].text(self.explicit_pressures[12],250, r'WSM 0K', fontsize=28, weight='bold', color='gray')
+
+
+
+#        if self.split:
+#            self.set_xaxis(_arr2[2][0], self.pressure)
+#            self.set_yaxis_separate(_arr2[0][0], 'CB ren ({})'.format(self.gap_units),self.cond_ylims, self.cond_yticks)
+#            self.set_yaxis_separate(_arr2[1][0], 'VB ren ({})'.format(self.gap_units),self.val_ylims, self.val_yticks)
+#            self.set_yaxis_separate(_arr2[2][0], 'Gap ren ({})'.format(self.gap_units),self.gap_ylims, self.gap_yticks)
+#
+#            self.set_title(_arr[0][0], self.title[0])
+#            self.set_title(_arr2[0][0], self.title[1])
+#
+#        else:
+#            if self.main_title:
+#                self.set_title(_arr0[0][0], self.main_title)
+#
+#        # Custum stuff
+#        _arr[2][0].text(0.7,-82, r'$\mathbb{Z}_2\!=\!0$', fontsize=24,color='k')
+#        _arr[2][0].text(2.7, -82, r'$\mathbb{Z}_2\!=\!1$',fontsize = 24,color='k')
+#        _arr[2][0].text(1.85,-60,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
+#        _arr[2][0].text(1.35,-60,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
+#
+        legend_handles = [] 
+        for t, temp in enumerate(self.ref_temp):
+            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
+#                Line2D([0],[0],color='b',marker='o',markersize=8,linestyle='None',label=r'P$_{\text{C2}}$ plane')]
+        #legend_handles.append('')
+        #legend_handles.append('')
+
+        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = len(self.ref_temp),columnspacing=1)
+        _arr[0][0].add_artist(legend1)
+        
+        legend2_handles=[]
+        legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
+        legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
+        legend2 = _arr[1][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,0.28),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1,borderpad=0.2)
+        _arr[1][0].add_artist(legend2)
+
+        fig.subplots_adjust(hspace=0.0,top=0.90,right=0.95)
+
+        if self.split:
+            fig.align_ylabels()
+            fig2.align_ylabels()
+            self.save_figure_split(fig,fig2)
+        else:
+            fig.align_ylabels()
+            self.save_figure(fig)
+
+    def plot_total_pgap_indirect(self):
+
+        # Define figure
+        only=True  # only the Egap(P) for each T. If False, add gap renorm on top subplot
+
+        if only:
+            fig, _arr = plt.subplots(1,1, figsize=self.figsize, squeeze=False, sharex=True)
+        else:
+            fig, _arr = plt.subplots(2,1, figsize=self.figsize, squeeze=False, sharex=True)
+        #plt.subplots_adjust(hspace=0.05, top=0.95) 
+
+        if self.split:
+            raise Exception('split not yet implemented for te_pgap')
+            if only:
+                fig2, _arr2 = plt.subplots(1,1, figsize=self.figsize, squeeze=False, sharex=True)
+            else:
+                fig2, _arr2 = plt.subplots(2,1, figsize=self.figsize, squeeze=False, sharex=True)
+          #  plt.subplots_adjust(hspace=0.05, top=0.95) 
+
+
+        # Read explicit data, if required
+        if self.gap_fname is not None:
+
+            self.exgap = GAPfile(self.gap_fname, read=False)
+            self.read_other_file()
+
+            
+            if self.exgap.explicit_gap_energies_units == 'eV':
+                self.explicit_gap_energies = self.exgap.explicit_gap_energies*1000
+            else:
+                self.explicit_gap_energies = self.exgap.explicit_gap_energies
+
+            self.explicit_pressures = self.exgap.explicit_pressures
+
+
+        if not self.zpr_fnames and self.te_fnames:
+            raise Exception('For total pgap, both te_fnames and zpr_fnames must be provided')
+        if not self.valence:
+            raise Exception('For total pgap, must provide valence band index (index starting at 1)')
+
+        file_qty = len(self.zpr_fnames)
+
+        if len(self.te_fnames) != file_qty:
+            raise Exception('zpr_fnames and te_fnames must contain the same number of files, but zpr_fnames has {} and te_fnames has {}.'.format(file_qty, len(te_fnames)))
+
+        if not self.band_numbers:
+            raise Exception('Must provide valence and conduction band numbers vis band_numbers')
+
+
+        # Read and treat all input files
+        for ifile in range(file_qty):
+                
+            # Define file class
+            zpr_file = ZPRfile(self.zpr_fnames[ifile], read=False)
+            zpr_file.read_nc()
+            te_file = TEfile(self.te_fnames[ifile], read=False)
+            te_file.read_nc()
+
+
+            # Set parameters for this file
+            self.nsppol = zpr_file.nsppol
+            self.nkpt = zpr_file.nkpt
+            self.max_band = te_file.max_band
+            self.ntemp = zpr_file.ntemp
+            self.temp = zpr_file.temp
+            self.kpoints = zpr_file.kpoints
+            if self.units == 'eV':
+                self.eig0 = zpr_file.eig0*cst.ha_to_ev
+                zpr_file.correction = zpr_file.correction*cst.ha_to_ev
+            elif self.units == 'meV':
+                self.eig0 = zpr_file.eig0*cst.ha_to_ev*1000
+                zpr_file.correction = zpr_file.correction*cst.ha_to_ev*1E3
+
+            # Checkups, put in a separate function...
+            if te_file.nsppol != self.nsppol:
+                raise Exception('zpr and te files (index {}) do not have the same nsppol.'.format(ifile))
+            if te_file.nkpt != self.nkpt:
+                raise Exception('zpr and te files (index {}) do not have the same nkpt.'.format(ifile))
+            if zpr_file.max_band != self.max_band:
+                zpr_max_band = zpr_file.max_band
+            else:
+                zpr_max_band = None
+                raise Exception('zpr and te files (index {}) do not have the same max_band.'.format(ifile))
+            if te_file.ntemp != self.ntemp:
+                raise Exception('zpr and te files (index {}) do not have the same ntemp.'.format(ifile))
+            if not np.array_equal(te_file.temp, self.temp):
+                raise Exception('zpr and te files (index {}) do not have the same temperature array.'.format(ifile))
+            if not np.array_equal(te_file.kpoints,self.kpoints):
+                raise Exception('zpr and te files (index {}) do not have the same kpoint array.'.format(ifile))
+            if not np.allclose(te_file.eig0, self.eig0[0,:,:self.max_band]):
+                raise Exception('zpr and te files (index {}) do not have the same bare eigenvalues.'.format(ifile))
+
+
+           ############################################### 
+#            self.gridsize = self.zpr.gridsize
+            self.gap_units = zpr_file.gap_energy_units
+
+            input_units = te_file.gap_energy_units
+
+            if input_units == self.units:
+                pass
+            else:
+                if self.units == 'eV':
+                    if input_units == 'Hartree':
+                        te_file.eig0 = te_file.eig0*cst.ha_to_ev
+                        te_file.correction = te_file.correction*cst.ha_to_ev
+                    elif input_units == 'meV':
+                         te_file.eig0 = te_file.eig0*1E-3
+                         te_file.correction = te_file.correction*1E-3
+                    else:
+                        raise Exception('What kind of energy units are you using?!?')
+                if self.units == 'meV':
+                    if input_units == 'Hartree':
+                        te_file.eig0 = te_file.eig0*cst.ha_to_ev*1000
+                        te_file.correction = te_file.correction*cst.ha_to_ev*1000
+                    elif input_units == 'eV':
+                        te_file.eig0 = te_file.eig0*1E3
+                        te_file.correction = te_file.correction*1E3
+                    else:
+                        raise Exception('What kind of energy units are you using?!?')
+
+            # Set side of phase transition for split2 option
+            if self.split2:
+                if self.pressure[ifile] < self.crit_pressure:
+                    side=0
+                else:
+                    side=1
+
+            # Retrieve data from files
+            self.correction = np.zeros((self.nsppol,self.nkpt, self.max_band, self.ntemp))
+            self.eigcorr = np.zeros((self.nsppol,self.nkpt, self.max_band, self.ntemp))
+
+            print(te_file.correction[0,:,27,-1])
+            print(zpr_file.correction[0,:,27,-1])
+            for t in range(self.ntemp):
+                if self.max_band is not None:
+                    self.correction[:,:,:,t] = te_file.correction[:,:,:,t] + zpr_file.correction[:,:,:self.max_band,t]
+                    self.eigcorr[:,:,:,t] = self.eig0[:,:,:self.max_band] + self.correction[:,:,:,t]
+                else:
+                    self.correction = te_file.correction + zpr_file.correction
+                    self.eigcorr = self.eig0 + self.correction
+            print(self.correction[0,:,27,-1])
+            
+            # Initialize plotting arrays
+            if ifile==0:
+                if self.split: # distinct data for left and rifht gap
+                    self.full_gap_ren = np.zeros((file_qty, self.ntemp,2))
+                    self.full_band_ren = np.zeros((file_qty,self.ntemp,2,2)) # file, temp, vbcb, lr 
+                    self.ref_temp = self.temp
+                    self.full_energy0 = np.zeros((file_qty))
+
+                if self.split2: # single array, left gap for trovoal phase and right gap for topol phase
+                    self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+                    self.full_band_ren = np.zeros((file_qty,self.ntemp,2))
+                    self.ref_temp = self.temp
+                    self.full_energy0 = np.zeros((file_qty))
+
+                else:
+                    self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+                    self.full_gap_ren_band = np.zeros((file_qty,self.ntemp,2))
+                    self.full_gap_loc = np.zeros((file_qty, self.ntemp+1,2))
+                    self.full_gap_energy = np.zeros((file_qty, self.ntemp+1))
+                    self.full_gap_energy_band = np.zeros((file_qty, self.ntemp+1,2))
+                    self.full_energy0 = np.zeros((file_qty))
+                    full_energy = np.zeros((file_qty,self.ntemp))
+                    self.ref_temp = self.temp
+            else:
+                if np.array_equal(self.temp,self.ref_temp) == False:
+                    raise Exception('All files must have the same temperature array! Please correct file #{}.'.format(ifile+1))
+
+            if self.ntemp > len(self.color):
+                raise Exception('Color vector is not long enough! Please provide {} color list.'.format(self.ntemp))
+
+#            if self.split:
+#                self.full_gap_ren[ifile,:,:] = self.gap_ren
+#     #           print(np.shape(self.gap_ren))
+#     #           print(np.shape(self.full_gap_ren))
+#            if self.split2:
+#                self.full_gap_ren[ifile,:] = self.gap_ren[:,side]
+#            else:
+#
+#                self.full_gap_ren[ifile,:] = self.gap_ren
+
+            if self.split:
+                raise Exception('Split not ready yet! How come did you get this far?!?')
+
+            if self.indirect:
+                self.full_gap_loc[ifile,:,:], self.full_gap_energy[ifile,:], self.full_gap_ren[ifile,:], self.full_gap_energy_band[ifile,:,:],self.full_gap_ren_band[ifile,:,:] = self.get_indirect_gap_info(self.eig0, self.eigcorr,False)
+            else:
+                raise Exception('Direct gap not yet implemented, get to work!')
+
+            if not self.gap_fname:
+                self.full_energy0[ifile] = self.full_gap_energy[ifile,0]
+            else:
+                # find P in explicit pressures array
+                p_index = self.find_pressure_index(self.pressure[ifile])
+                self.full_energy0[ifile] = self.explicit_gap_energies[p_index]
+
+
+
+####### unchanged stuff strts here
+
+#                  # Initialize full arrays
+#            if ifile==0:
+#                if self.split:
+#                    self.full_gap_energy = np.zeros((file_qty, self.ntemp,2))
+#                    self.full_gap_ren = np.zeros((file_qty, self.ntemp,2))
+#                    self.ref_temp = self.temp
+#                    self.full_energy0 = np.zeros((len(self.explicit_pressures),2))
+#
+#                if self.split2: # single array, left gap for trovoal phase and right gap for topol phase
+#                    self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+#                    self.full_gap_energy = np.zeros((file_qty, self.ntemp))
+#                    self.ref_temp = self.temp
+#                    self.full_energy0 = np.zeros((file_qty))
+#
+#                else:
+#                    self.full_gap_energy = np.zeros((file_qty, self.ntemp))
+#                    self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+#                    self.ref_temp = self.temp
+#                    self.full_energy0 = np.zeros((file_qty))
+#            else:
+#                if np.array_equal(self.temp,self.ref_temp) == False:
+#                    raise Exception('All files must have the same temperature array! Please correct file #{}.'.format(ifile+1))
+#
+#            if self.ntemp > len(self.color):
+#                raise Exception('Color vector is not long enough! Please provide {} color list.'.format(self.ntemp))
+
+#            print(self.gap_energy)
+#            if self.split:
+#                self.full_gap_energy[ifile,:,:] = self.gap_energy
+#                self.full_gap_ren[ifile,:,:] = self.gap_ren
+#                if not self.gap_fname:
+#                    self.full_energy0[ifile,:] = self.energy0
+#                else:
+#                    # find P in explicit pressures array
+#                    p_index = self.find_pressure_index(self.pressure[ifile])
+#                    self.full_energy0[ifile,:] = self.explicit_gap_energies[p_index]
+#
+#            if self.split2:
+#                self.full_gap_ren[ifile,:] = self.gap_ren[:,side]
+#                self.full_gap_energy[ifile,:] = self.gap_energy[:,side]
+#                print(self.gap_fname)
+#                if not self.gap_fname:
+#                    self.full_energy0[ifile] = self.energy0[ifile,side]
+#                else:
+#                    # find P in explicit pressures array
+#                    p_index = self.find_pressure_index(self.pressure[ifile])
+#                    self.full_energy0[ifile] = self.explicit_gap_energies[p_index]
+#            else:
+#                self.full_gap_energy[ifile,:] = self.gap_energy
+#                self.full_gap_ren[ifile,:] = self.gap_ren
+#                if not self.gap_fname:
+#                    self.full_energy0[ifile] = self.energy0
+#                else:
+#                    p_index = self.find_pressure_index(self.pressure[ifile])
+#                    print(p_index)
+#                    self.full_energy0[ifile] = self.explicit_gap_energies[p_index]
+
+            if self.gap_fname is not None:
+                if self.split:
+                    for a in range(2):
+                #        self.full_energy0[ifile,a] = self.explicit_gap_energies[ifile]
+                        self.full_gap_energy[ifile,:,a] =  self.full_gap_ren[ifile,:,a] + np.ones(self.ntemp)*self.full_energy0[ifile,a]
+                elif self.split2:
+                    full_energy[ifile,:] = self.full_gap_ren[ifile,:] + np.ones(self.ntemp)*self.full_energy0[ifile]
+                else:
+                 #   self.full_energy0[ifile] = self.explicit_gap_energies[ifile]
+                    full_energy[ifile,:] =  self.full_gap_ren[ifile,:] + np.ones(self.ntemp)*self.full_energy0[ifile]
+
+
+
+        print(np.shape(self.full_gap_energy))
+        self.full_gap_energy = full_energy
+        print(np.shape(self.full_gap_energy))
+        if self.crit_pressure is not None:
+            crit_index = self.find_temp_index()
+            if self.gap_fname is not None:
+                crit_index2 = self.find_temp_index2(self.explicit_pressures)
+                print('crit_index2',crit_index2)
+        else:
+            crit_index = None
+
+
+        if self.follow:
+            self.full_energy0[-1,:] = -self.full_energy0[-1,:]
+            self.full_gap_energy[-1,:,:] = -self.full_gap_energy[-1,:,:]
+
+    # Extrapolate behavior linearly towards TPT... it IS a bit sketchy.
+        pressure1 = np.arange(1.5,2.0,0.1)
+        tmparr = np.arange(2.1,2.6,0.1) # change 2.2 to 2.6 foir full BZ
+        pressure2 = np.arange(2.3,3.0,0.1)
+        tmparr2 = np.arange(2.0,2.3,0.1)
+#        self.extr_pressure2 = np.arange(2.3, 3.0, 0.1)
+
+        # linearize unperturbed gap energy to extrapolate inside WSM phase
+        y0,y1 = np.polyfit(self.explicit_pressures[15:20], self.explicit_gap_energies[15:20],1)
+        tmp2 = y1 + tmparr*y0
+        self.extr_pressure1 = np.concatenate((pressure1, tmparr))
+
+        y0,y1 = np.polyfit(self.explicit_pressures[21:29], self.explicit_gap_energies[21:29],1)
+        tmp22 = y1 + tmparr2*y0
+        self.extr_pressure2 = np.concatenate((pressure2,tmparr2))
+
+        self.extr_full_gap_ren1 = np.zeros((len(self.extr_pressure1), self.ntemp))
+        self.extr_full_gap_ren2 = np.zeros((len(self.extr_pressure2), self.ntemp))
+        self.extr_full_gap_energy1 = np.zeros((len(self.extr_pressure1), self.ntemp))
+        self.extr_full_gap_energy2 = np.zeros((len(self.extr_pressure2), self.ntemp))
+        extr_energy01 = np.zeros((len(pressure1)))
+        extr_energy02 = np.zeros((len(pressure2)))
+#        self.extr_full_energy02 = np.zeros((len(self.extr_pressure2)))
+
+        # Get full_gap_energy0 (explicit bare gap energies) from explicit data
+        for p, pres in enumerate(pressure1):
+            ind = self.find_pressure_index(pres)
+            extr_energy01[p] = self.explicit_gap_energies[ind]
+
+        self.extr_full_energy01 = np.concatenate((extr_energy01,tmp2))
+
+        for p, pres in enumerate(pressure2):
+            ind = self.find_pressure_index(pres)
+            extr_energy02[p] = self.explicit_gap_energies[ind]
+
+        self.extr_full_energy02 = np.concatenate((extr_energy02,tmp22))
+
+        #Store extrapolated phase boundaries (T)
+        self.pc1 = np.zeros((self.ntemp))
+        self.pc2 = np.zeros((self.ntemp))
+
+        for T in range(self.ntemp):
+
+            if self.split:
+                #trivial side
+                x0,x1 = np.polyfit(self.pressure[0:crit_index+1], self.full_gap_ren[0:crit_index+1,T,0], 1)
+                self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
+                self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
+
+                # topol side
+                x0,x1 =  np.polyfit(self.pressure[crit_index+1:], self.full_gap_ren[crit_index+1:,T,0], 1)
+                self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
+                self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
+
+            elif self.split2:
+                #trivial side
+                x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_gap_ren[crit_index-1:crit_index+1,T], 1)
+                self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
+                self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
+
+                # topol side
+                x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_gap_ren[crit_index+1:crit_index+3,T], 1)
+                self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
+                self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
+
+
+            else:
+                #trivial side
+                x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_gap_ren[crit_index-1:crit_index+1,T], 1)
+                print('For T={} K:'.format(self.temp[T]))
+                self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
+                self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
+                x0,x1 = np.polyfit(self.extr_pressure1,self.extr_full_gap_energy1[:,T],1)
+                print('trivial side : {} GPa'.format(-x1/x0))
+                self.pc1[T] = -x1/x0
+                # topol side
+                x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_gap_ren[crit_index+1:crit_index+3,T], 1)
+                self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
+                self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
+                x0,x1 = np.polyfit(self.extr_pressure2,self.extr_full_gap_energy2[:,T],1)
+                print('topol side : {} GPa'.format(-x1/x0))
+                self.pc2[T] = -x1/x0
+
+#        print(self.extr_pressure1)
+#        print(self.extr_full_gap_energy1)
+#        print(self.extr_pressure2)
+#        print(self.extr_full_gap_energy2)
+
+        for T in range(self.ntemp):
+            if crit_index is not None:
+                s = crit_index+1
+
+                if self.split:
+                    # figure 1
+                    if T==self.temp[0]:
+                        ###### FIX ME : keep explicit_pressures and explicit_gap_energies, just get a new crit index for this array! 
+                        if self.gap_fname is not None:
+#                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='Static T=0')
+                            if self.crit_index2 is not None:
+                                if only:
+                                    _arr[0][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
+
+                            else:
+                                if only:
+                                    _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='Static T=0')
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', color='black', label='Static T=0')
+
+                        else:
+                            if only:
+                                _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='Static T=0')
+                            else:
+                                _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black', label='Static T=0')
+                    else:
+                        if only:
+                            _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
+                        else:
+                            _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
+    
+                    if only:
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,0], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    else:
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T,0], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+        #                self.set_legend_gap(_arr[0][0])
+                        _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,0], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                #        _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='o', color='black', label='interpolated')
+    
+                    # extrapolated data
+                    if only:
+                        _arr[0,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                    else:
+                        _arr[0,0].plot(self.extr_pressure1[:-2], self.extr_full_gap_ren1[:-2,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+
+    ##-------------------------------------- passed TPT
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.30), ncol = (self.ntemp+1), fontsize=12)
+                    if only:
+                        handles, labels = _arr[0,0].get_legend_handles_labels()
+                        _arr[0][0].legend(self.flip(handles, 4), self.flip(labels, 4), loc='lower center', bbox_to_anchor=(0.5,-0.50), ncol=4, fontsize=20, numpoints=1)
+                    else:
+                        handles, labels = _arr[1,0].get_legend_handles_labels()
+                        _arr[1][0].legend(self.flip(handles, 4), self.flip(labels, 4), loc='lower center', bbox_to_anchor=(0.5,-0.50), ncol=4, fontsize=20, numpoints=1)
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.30), ncol = (self.ntemp+1), fontsize=22)
+
+#                    _arr[1][0].legend(numpoints = 1, loc = 'center right', bbox_to_anchor=(1.27,1.62), ncol = 1, fontsize=22)
+
+            #        self.set_legend_pgap(_arr2[0][0])
+    #                _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', linewidth=2.0, color=self.color[T], label=self.ref_temp[T])
+                    if T==self.temp[0]:
+                        if self.gap_fname is not None:
+#
+                            if crit_index2 is not None:
+                                if only:
+                                    _arr[0][0].plot(self.explicit_pressures[crit_index2+2,:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='Static T=0')
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+2:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='Static T=0')
+
+                    if only:
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,0], marker='o', linewidth=2.0, color=self.color[T])
+                    else:
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,0], marker='o', linewidth=2.0, color=self.color[T])
+                        _arr[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,0], marker='o', linewidth=2.0, color=self.color[T])
+
+                    if only:
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                    else:
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+
+                    if self.gap_fname is not None:
+                        x=1
+                        #_arr[1][0].plot(self.explicit_pressures[s:], self.explicit_gap_energies[s:],marker='d', color='black')
+                    else:
+                        if only:
+                            _arr[0][0].plot(self.pressure[s:], self.full_energy0[s:,0],marker='o', color='black')
+                        else:
+                            _arr[1][0].plot(self.pressure[s:], self.full_energy0[s:,0],marker='o', color='black')
+             #       _arr2[0][0].plot(self.pressure[s:], self.full_energy0[s:],marker='o', color='black')
+
+                    # figure 2
+                    if T==self.temp[0]:
+                        if self.gap_fname is not None:
+                            if only:
+                                _arr2[0][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
+                            else:
+                                arr2[1][0].plot(self.explicit_pressures[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
+                        else:
+                            if only:
+                                _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
+                            else:
+                                _arr2[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black', label='Static T=0')
+                    else:
+                        if only:
+                            _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black')
+                        else:
+                            _arr2[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,1],marker='d', color='black')
+    
+                    if only:
+                        _arr2[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,1], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    else:
+                        _arr2[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T,1], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+        #                self.set_legend_gap(_arr2[0][0])
+                        _arr2[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,1], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                #        _arr22[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='d', color='black', label='interpolated')
+
+                    if only:
+                        _arr2[0][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp+1, fontsize=14)
+                    else:
+                        _arr2[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp+1, fontsize=14)
+   
+            #        self.set_legend_pgap(_arr22[0][0])
+    #                _arr2[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', linewidth=2.0, color=self.color[T], label=self.ref_temp[T])
+                    if only:
+                        _arr2[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,1], marker='o', linewidth=2.0, color=self.color[T])
+                    else:
+                        _arr2[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,1], marker='o', linewidth=2.0, color=self.color[T])
+                        _arr2[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,1], marker='o', linewidth=2.0, color=self.color[T])
+
+                    if self.gap_fname is not None:
+                        if only:
+                            _arr2[0][0].plot(self.explicit_pressures[s:], self.full_energy0[s:,1],marker='d', color='black')
+                        else:
+                            _arr2[1][0].plot(self.explicit_pressures[s:], self.full_energy0[s:,1],marker='d', color='black')
+                    else:
+                        if only:
+                            _arr2[0][0].plot(self.pressure[s:], self.full_energy0[s:,1],marker='d', color='black')
+                        else:
+                            _arr2[1][0].plot(self.pressure[s:], self.full_energy0[s:,1],marker='d', color='black')
+             #       _arr22[0][0].plot(self.pressure[s:], self.full_energy0[s:],marker='d', color='black')
+
+#########################################
+       #-------- crit_index but no split or split2
+                else:
+                    if T==self.temp[0]:
+                        ###### FIX ME : keep explicit_pressures and explicit_gap_energies, just get a new crit index for this array! 
+                        if self.gap_fname is not None:
+#                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='Static T=0')
+                            if crit_index2 is not None:
+                                if only:
+                                     _arr[0][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=7, color='black', label='Static T=0')
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=7, color='black', label='Static T=0')
+                            else:
+                                if only:
+                                     _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', markersize=7,color='black', label='Static T=0')
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d',markersize=7, color='black', label='Static T=0')
+
+                        else:
+                            if only:
+                                _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black', label='Static T=0')
+                            else:
+                                _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black', label='Static T=0')
+#                    else:
+#                        _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
+    
+                    if only:
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=7, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    else:
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d',markersize=7, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+        #                self.set_legend_gap(_arr[0][0])
+                        _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=7, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                #        _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='o', color='black', label='interpolated')
+
+    #                if only:
+    #                    _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+    #                else:
+    #                    _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+    #    #                self.set_legend_gap(_arr[0][0])
+    #                    _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+    #            #        _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='o', color='black', label='interpolated')
+    
+                    # extrapolated data
+                    if only:
+                        _arr[0,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                    else:
+                        _arr[0,0].plot(self.extr_pressure1[:-2], self.extr_full_gap_ren1[:-2,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+
+    ##-------------------------------------- passed TPT
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.30), ncol = (self.ntemp+1), fontsize=12)
+                    if only:
+                        handles, labels = _arr[0,0].get_legend_handles_labels()
+                        _arr[0][0].legend(self.flip(handles, 4), self.flip(labels, 4), loc='lower center', bbox_to_anchor=(0.5,-0.50), ncol=4, fontsize=20, numpoints=1)
+                    else:
+                        handles, labels = _arr[1,0].get_legend_handles_labels()
+                        _arr[1][0].legend(self.flip(handles, 4), self.flip(labels, 4), loc='lower center', bbox_to_anchor=(0.5,-0.50), ncol=4, fontsize=20, numpoints=1)
+#                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.30), ncol = (self.ntemp+1), fontsize=22)
+
+#                    _arr[1][0].legend(numpoints = 1, loc = 'center right', bbox_to_anchor=(1.27,1.62), ncol = 1, fontsize=22)
+
+            #        self.set_legend_pgap(_arr2[0][0])
+    #                _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', linewidth=2.0, color=self.color[T], label=self.ref_temp[T])
+                    if T==self.temp[0]:
+                        if self.gap_fname is not None:
+#
+                            if crit_index2 is not None:
+                                if only:
+                                     _arr[0][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=7, color='black', label=None)
+                                else:
+                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=7, color='black', label=None)
+
+                    if only:
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+                    else:
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
+                        _arr[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
+
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+
+                    if self.gap_fname is not None:
+                        pass
+                        #_arr[1][0].plot(self.explicit_pressures[s:], self.explicit_gap_energies[s:],marker='d', color='black')
+                    else:
+                        if only:
+                            _arr[0][0].plot(self.pressure[s:], self.full_energy0[s:,0],marker='o', color='black')
+                        else:
+                            _arr[1][0].plot(self.pressure[s:], self.full_energy0[s:,0],marker='o', color='black')
+             #       _arr2[0][0].plot(self.pressure[s:], self.full_energy0[s:],marker='o', color='black')
+
+
+            #---------------------- No crit_index
+            else:
+
+                if only:
+                    raise Exception('Only keyword not implemented yet without critical pressure index')
+                if self.split:
+                    # figure 1
+                    _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+                    #_arr[1][0].plot(self.pressure, self.full_energy0,marker='d', color='black')
+
+                    #figure 2
+                    _arr2[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr2[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr2[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+                    #_arr2[1][0].plot(self.pressure, self.full_energy0,marker='d', color='black')
+
+                else:
+                    _arr[0][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].plot(self.pressure, self.full_gap_ren[:,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[1][0].legend(numpoints = 1, loc = 'lower center', bbox_to_anchor=(0.5,-0.25), ncol = self.ntemp, fontsize=16)
+                    #_arr[1][0].plot(self.pressure, self.full_energy0,marker='d', color='black')
+
+        if only:
+            self.set_vrefs(_arr[0][0], self.pressure, 0.)
+            self.set_hrefs(self.ylims, _arr[0][0], self.crit_pressure,'black')
+            if self.split:
+                self.set_vrefs(_arr2[0][0], self.pressure, 0.)
+                self.set_hrefs(self.ylims, _arr2[0][0], self.crit_pressure,'black')
+
+        else:
+            for i in range(2):
+        #            if i==0 :
+                    self.set_vrefs(_arr[i][0], self.pressure, 0.)
+                    self.set_hrefs(self.ylims, _arr[i][0], self.crit_pressure,'black')
+                    if self.split:
+                        self.set_vrefs(_arr2[i][0], self.pressure, 0.)
+                        self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure,'black')
+
+        limms = [[-80.,60.],[0.,350]]
+#        limms = [[-60.,60.],[0.,80.],[-80.,40.]]
+        if self.gap_ylims is not None:
+            limms[0] = self.gap_ylims
+        if self.egap_ylims is not None:
+            limms[1] = self.egap_ylims
+
+        if only:
+            ylims = limms[1]    
+            self.set_vrefs(_arr[0][0], self.pressure, 0.)
+#            if i==0:
+            if self.crit_pressure:
+                pc1 = self.crit_pressure
+                self.set_hrefs(ylims, _arr[0][0], pc1,'gray')
+
+                if self.crit_pressure2:
+                    pc2 = self.crit_pressure2
+                    self.set_hrefs(ylims, _arr[0][0], pc2,'gray')
+                    _arr[0][0].fill([pc1,pc2,pc2,pc1],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+                else:
+                    print('No value was given for PC2')
+            else:
+                print('No value was given for PC1')
+#            self.set_hrefs(ylims, _arr[0,0], 2.18,'orange')
+#            self.set_hrefs(ylims, _arr[0,0], 2.50,'orange')
+#            _arr[0,0].fill([2.18,2.50,2.50,2.18],[ylims[0],ylims[0],ylims[1],ylims[1]],'orange',alpha=0.2)
+#            self.set_hrefs(ylims, _arr[0,0], 2.68,'magenta')
+
+
+        else:
+            for i in range(2):
+    #            lims = _arr[i,0].get_ylim() 
+    #            ylims = lims
+                ylims = limms[i]    
+                self.set_vrefs(_arr[i][0], self.pressure, 0.)
+    #            if i==0:
+                pc1 = self.crit_pressure
+                pc2 = self.crit_pressure2
+
+                self.set_hrefs(ylims, _arr[i][0], pc1,'black')
+                self.set_hrefs(ylims, _arr[i][0], pc2,'black')
+                _arr[i][0].fill([pc1,pc2,pc2,pc1],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+    #            else:
+                self.set_hrefs(ylims, _arr[i,0], 2.28,'black')
+                self.set_hrefs(ylims, _arr[i,0], 2.65,'black')
+                _arr[i,0].fill([2.28,2.65,2.65,2.28],[ylims[0],ylims[0],ylims[1],ylims[1]],'orange',alpha=0.2)
+ 
+
+        if only:
+            self.set_xaxis(_arr[0][0], self.pressure)
+            self.set_yaxis(_arr[0][0], 'Gap energy ({})'.format(self.gap_units))
+            _arr[0,0].set_ylim(limms[1])
+
+        else:
+            self.set_xaxis(_arr[1][0], self.pressure)
+            self.set_yaxis(_arr[0][0], 'Gap renormalization ({})'.format(self.gap_units))
+            self.set_yaxis(_arr[1][0], 'Gap energy ({})'.format(self.gap_units))
+
+            _arr[1,0].set_ylim(limms[1])
+
+
+#        if only:
+#            _arr[0,0].text(self.explicit_pressures[12],180, r'$\mathbf{Z_2=0}$', fontsize=24) 
+#            _arr[0,0].text(self.explicit_pressures[30],180, r'$\mathbf{Z_2=1}$', fontsize=24) 
+#
+##            _arr[0,0].text(self.explicit_pressures[5],290, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=26)
+##            _arr[0,0].text(self.explicit_pressures[38],290, r'$\frac{k_z c}{2\pi} = 0.5349$',fontsize=26)
+#
+#
+#            _arr[0,0].text(self.explicit_pressures[12],250, r'WSM 0K', fontsize=26, weight='bold', color='gray')
+#            _arr[0,0].text(self.explicit_pressures[25],250, r'WSM 300K', fontsize=26, weight='bold', color='orange')
+#
+#        else:
+#            _arr[1,0].text(self.explicit_pressures[12],180, r'$\mathbf{Z_2=0}$', fontsize=24) 
+#            _arr[1,0].text(self.explicit_pressures[30],180, r'$\mathbf{Z_2=1}$', fontsize=24) 
+#
+##            _arr[1,0].text(self.explicit_pressures[5],290, r'$\frac{k_z c}{2\pi} = 0.5$',fontsize=26)
+##            _arr[1,0].text(self.explicit_pressures[38],290, r'$\frac{k_z c}{2\pi} = 0.5349$',fontsize=26)
+#
+#
+#            _arr[1,0].text(self.explicit_pressures[12],250, r'WSM 0K', fontsize=26, weight='bold', color='gray')
+#            _arr[1,0].text(self.explicit_pressures[25],250, r'WSM 300K', fontsize=26, weight='bold', color='orange')
+
+
+
+        if self.split:
+            if only:
+                self.set_xaxis(_arr2[0][0], self.pressure)
+                self.set_yaxis(_arr2[0][0], 'Gap energy ({})'.format(self.gap_units))
+                self.set_title(_arr[0][0], self.title[0])
+
+            else:
+                self.set_xaxis(_arr2[1][0], self.pressure)
+                self.set_yaxis(_arr2[0][0], 'Gap renormalization ({})'.format(self.gap_units))
+                self.set_yaxis(_arr2[1][0], 'Gap energy ({})'.format(self.gap_units))
+
+                self.set_title(_arr[0][0], self.title[0])
+                self.set_title(_arr2[0][0], self.title[1])
+        else:
+            self.set_title(_arr[0][0], self.main_title)
+
+#        fig.subplots_adjust(hspace=0.09, bottom=0.18)
+
+#        plt.subplots_adjust(left = 0.1, bottom = 0.11, right=0.9, top = 0.93, wspace=0.2,hspace=0.07)
+        if only:
+            fig.subplots_adjust(bottom= 0.31, right = 0.94)
+        else:
+            fig.subplots_adjust(left = 0.1, bottom = 0.21, right=0.95, top = 0.95, wspace=0.2,hspace=0.07)
+
+        # Custom text
+        if only:
+            _arr[0][0].text(0.7,250, r'$\mathbb{Z}_2\!=\!0$',fontsize=24,color='k')
+            _arr[0][0].text(2.7,250, r'$\mathbb{Z}_2\!=\!1$',fontsize=24,color='k')
+            _arr[0][0].text(1.90,200,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
+            _arr[0][0].text(1.50,210,r'Static',fontsize=20,color='#5A5A5A',weight='bold')
+            _arr[0][0].text(1.50,190,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
+
+            legend_handles = []
+            legend_handles.append(Line2D([0],[0],color='k',linewidth=1.5,label=r'0 K Static'))
+            for t,T in enumerate(self.ref_temp):
+                legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5,label=r'{:>3.0f} K'.format(T)))
+
+            legend1 = _arr[0][0].legend(handles=legend_handles, loc=9, bbox_to_anchor=(0.5,1.15),fontsize=20,handletextpad=0.4,handlelength=1.4,frameon=True,ncol=len(self.ref_temp)+1,columnspacing=1)
+            _arr[0][0].add_artist(legend1)
+
+            legend2_handles = []
+            legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
+            legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
+            legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol=1,labelspacing=0.1,borderpad=0.2)
+            _arr[0][0].add_artist(legend2)
+
+        else:
+            print('Complete legend not implemented yet')
+
+
+#        plt.show()
+#        plt.subplots_adjust(hspace=0.05, top=0.95) 
+
+        if self.split:
+            fig.align_ylabels()
+            fig2.align_ylabels()
+            self.save_figure_split(fig,fig2)
+        else:
+            fig.align_ylabels()
+            self.save_figure(fig)
+
+
+
 
 
     def plot_split_contribution(self):
@@ -4564,6 +6436,13 @@ class ZPR_plotter(object):
         _arr.text(2.3,400,r'WSM',fontsize=24,color='#5A5A5A')
 
 
+        if self.pgap:
+            _arr.set_title('EPI',fontsize=24)
+        if self.te_pgap:
+            _arr.set_title('TE',fontsize=24)
+        if self.total_pgap:
+            _arr.set_title('EPI+TE', fontsize=24)
+
 #        _inset = inset_axes(_arr, loc=2,width='30%', height='30%',borderpad=3)
 #        _inset.plot(self.ref_temp,self.pc2-self.pc1,'b')
 
@@ -4720,7 +6599,7 @@ class ZPR_plotter(object):
                 return lst.index(self.tmax)
             else:
                 return None
-        if self.pgap or self.te_pgap:
+        if self.pgap or self.te_pgap or self.total_pgap:
             lst = list(self.pressure)
             if self.crit_pressure in lst:
                 return lst.index(self.crit_pressure)
@@ -4765,6 +6644,255 @@ class ZPR_plotter(object):
             return None
 
 
+    def get_gap_info(self, unpert,pert,split):
+
+         # Finds the location of the unperturbed and perturbed direct gap + computes the gap energy
+        val = self.valence - 1
+        cond = val + 1
+
+        if self.spline:        
+            # Interpolate kpoints
+            self.interpolate_kpoints()
+            # Interpolate bare eigenvalues
+            unpert = self.interpolate_eigenvalues(unpert)
+            # Interpolated eig(T)
+            tmp = np.zeros((self.nsppol,self.nkpt_fine,self.max_band,self.ntemp))
+            for t in range(self.ntemp):
+                tmp[:,:,:,t] = self.interpolate_eigenvalues(pert[:,:,:,t])
+
+            pert = tmp
+
+        if split == False:
+
+            loc = np.zeros((self.ntemp+1),dtype=int)
+            ener = np.zeros((self.ntemp+1), dtype=float)
+            ren = np.zeros((self.ntemp), dtype=float)
+        
+            arr0 = unpert[0,:,cond] - unpert[0,:,val]
+            loc[0] = np.argmin(arr0)
+            ener[0] = np.amin(arr0)
+              
+            for i in range(self.ntemp):
+           
+                arr = pert[0,:,cond,i]-pert[0,:,val,i]
+                loc[i+1] = np.argmin(arr)
+                ener[i+1] = np.amin(arr)
+                ren[i] = ener[i+1]-ener[0]
+
+            return loc, ener, ren
+
+        elif split==True:
+            loc = np.zeros((self.ntemp+1,2),dtype=int)
+            ener = np.zeros((self.ntemp+1,2), dtype=float)
+            ren = np.zeros((self.ntemp,2), dtype=float)
+        
+            # Define mid in kpt array
+            if not self.split_kpt:
+                raise Exception('split_kpt is not well-defined, as reduced_kpt_array cannot be splitted. Please check your input')
+#            if self.spline:
+            '''FIX ME does not work with all spline_factors. Sometimes it returns kmid=None... '''
+            kmid = self.find_kpt_index(self.split_kpt)
+ #           else:
+ #               kmid = self.get_param_index(self.reduced_kpath, self.split_kpt)
+#            kmid = int(self.reduced_nkpt/2.)+1
+
+            #Treat left gap
+            arr0 = unpert[0,:kmid,cond] - unpert[0,:kmid,val]
+            loc[0,0] = np.argmin(arr0)
+            ener[0,0] = np.amin(arr0)
+            diff = (unpert[:,:kmid,28]-unpert[:,:kmid,27])
+
+             
+            for i in range(self.ntemp):
+                arr = pert[0,:kmid,cond,i]-pert[0,:kmid,val,i]
+                loc[i+1,0] = np.argmin(arr)
+                ener[i+1,0] = np.amin(arr) 
+                ren[i,0] = ener[i+1,0]-ener[0,0]
+       
+            #Treat right gap
+            arr0 = unpert[0,kmid:,cond] - unpert[0,kmid:,val]
+            loc[0,1] = np.argmin(arr0)+kmid
+            ener[0,1] = np.amin(arr0)
+
+            
+            for i in range(self.ntemp):
+                arr = pert[0,kmid:,cond,i]-pert[0,kmid:,val,i]
+                loc[i+1,1] = np.argmin(arr)+kmid
+                ener[i+1,1] = np.amin(arr) 
+                ren[i,1] = ener[i+1,1]-ener[0,1]
+
+
+            return loc, ener, ren
+
+    def get_indirect_gap_info(self,unpert,pert,split):
+        # Gets indirect gap information
+
+        # Finds the location of the unperturbed and perturbed direct gap + computes the gap energy
+        val = self.valence - 1
+        cond = val + 1
+
+        if self.spline:
+            # Interpolate kpoints
+            self.interpolate_kpoints()
+            # Interpolate bare eigenvalues
+            unpert = self.interpolate_eigenvalues(unpert)
+            # Interpolated eig(T)
+            tmp = np.zeros((self.nsppol,self.nkpt_fine,self.max_band,self.ntemp))
+            for t in range(self.ntemp):
+                tmp[:,:,:,t] = self.interpolate_eigenvalues(pert[:,:,:,t])
+
+            pert = tmp
+
+
+        if split == False:
+
+            loc = np.zeros((self.ntemp+1,2),dtype=int)
+            ener = np.zeros((self.ntemp+1), dtype=float)
+            ener_band = np.zeros((self.ntemp+1,2), dtype=float)
+            ren = np.zeros((self.ntemp), dtype=float)
+            ren_band = np.zeros((self.ntemp,2), dtype=float)
+
+            arrc = unpert[0,:,cond]
+            arrv = unpert[0,:,val]
+            loc[0,0] = np.argmax(arrv)
+            loc[0,1] = np.argmin(arrc)
+            ener_band[0,0] = arrv[loc[0,0]]
+            ener_band[0,1] = arrc[loc[0,1]] 
+            ener[0] = ener_band[0,1] - ener_band[0,0]
+              
+            for i in range(self.ntemp):
+           
+                arrc = pert[0,:,cond,i]
+                arrv = pert[0,:,val,i]
+                loc[i+1,0] = np.argmax(arrv)
+                loc[i+1,1] = np.argmin(arrc)
+                ener_band[i+1,0] = arrv[loc[i+1,0]] 
+                ener_band[i+1,1] = arrc[loc[i+1,1]] 
+                ener[i+1] = ener_band[i+1,1] - ener_band[i+1,0] 
+                for j in range(2):
+                    ren_band[i,j] = ener_band[i+1,j] - ener_band[0,j]
+                ren[i] = ener[i+1]-ener[0]
+
+            return loc, ener, ren, ener_band, ren_band
+
+        elif split==True:
+            loc = np.zeros((self.ntemp+1,2,2),dtype=int)
+            ener = np.zeros((self.ntemp+1,2), dtype=float)
+            ener_band = np.zeros((self.ntemp+1,2,2), dtype=float)
+            ren = np.zeros((self.ntemp,2), dtype=float)
+            ren_band = np.zeros((self.ntemp,2,2), dtype=float)
+
+        
+            # Define mid in kpt array
+            if self.spline:
+                kmid = self.get_param_index(self.kpoints_fine, self.split_kpt)
+            else:
+                kmid = self.get_param_index(self.reduced_kpath, self.split_kpt)
+
+
+            #Treat left gap
+            arrc = unpert[0,:kmid,cond]
+            arrv = unpert[0,:kmid,val]
+            loc[0,0,0] = np.argmax(arrv)
+            loc[0,0,1] = np.argmin(arrc)
+            ener_band[0,0,0] = arrv[loc[0,0,0]]
+            ener_band[0,0,1] = arrc[loc[0,0,1]] 
+            ener[0,0] = ener_band[0,0,1] - ener_band[0,0,0]
+             
+            for i in range(self.ntemp):
+                arrc = pert[0,:kmid,cond,i]
+                arrv = pert[0,:kmid,val,i]
+                loc[i+1,0,0] = np.argmax(arrv)
+                loc[i+1,0,1] = np.argmin(arrc)
+                ener_band[i+1,0,0] = arrv[loc[i+1,0,0]] 
+                ener_band[i+1,0,1] = arrc[loc[i+1,0,1]] 
+                ener[i+1,0] = ener_band[i+1,0,1] - ener_band[i+1,0,0] 
+                for j in range(2):
+                    ren_band[i,0,j] = ener_band[i+1,0,j] - ener_band[0,0,j]
+                ren[i,0] = ener[i+1,0]-ener[0,0]
+
+
+            #Treat right gap
+            arrc = unpert[0,kmid:,cond]
+            arrv = unpert[0,kmid:,val]
+            loc[0,1,0] = np.argmax(arrv)
+            loc[0,1,1] = np.argmin(arrc)
+            ener_band[0,1,0] = arrv[loc[0,1,0]]
+            ener_band[0,1,1] = arrc[loc[0,1,1]] 
+            ener[0,1] = ener_band[0,1,1] - ener_band[0,1,0]
+            loc[0,1,0] += kmid
+            loc[0,1,1] += kmid
+            
+            for i in range(self.ntemp):
+                arrc = pert[0,kmid:,cond,i]
+                arrv = pert[0,kmid:,val,i]
+                loc[i+1,1,0] = np.argmax(arrv)
+                loc[i+1,1,1] = np.argmin(arrc)
+                ener_band[i+1,1,0] = arrv[loc[i+1,1,0]] 
+                ener_band[i+1,1,1] = arrc[loc[i+1,1,1]] 
+                ener[i+1,1] = ener_band[i+1,1,1] - ener_band[i+1,1,0] 
+                for j in range(2):
+                    ren_band[i,1,j] = ener_band[i+1,1,j] - ener_band[0,1,j]
+                ren[i,1] = ener[i+1,1]-ener[0,1]
+                loc[i+1,1,0] += kmid
+                loc[i+1,1,1] += kmid
+
+            return loc, ener, ren, ener_band, ren_band
+
+    def interpolate_kpoints(self):
+        
+        nkpt = self.nkpt
+        kpts_coarse = self.kpoints
+
+        self.nkpt_fine = nkpt*self.spline_factor
+        x = np.arange(nkpt)
+        xfine = np.linspace(x[0],x[-1],self.nkpt_fine)
+        kpts = np.zeros((self.nkpt_fine,3))
+
+        for i in range(3):
+            spl = interp1d(x, kpts_coarse[:,i], kind='linear')
+            kpts[:,i] = spl(xfine)
+
+        self.kpoints_fine = kpts
+
+        return
+
+    def interpolate_eigenvalues(self,eig0):
+
+         nkpt = self.nkpt
+
+         x = np.arange(nkpt)
+         xfine = np.linspace(x[0],x[-1],self.nkpt_fine)
+
+#         if self.nsppol is None:
+#             self.nsppol = eig0.nsppol
+#         if self.max_band is None:
+#             self.max_band = eig0.max_band
+
+         eig = np.zeros((self.nsppol,self.nkpt_fine,self.max_band))
+
+         for j in range(self.max_band):
+             spl = interp1d(x,eig0[0,:,j], kind='cubic')
+             eig[0,:,j] = spl(xfine)
+
+         return eig
+
+    def find_kpt_index(self, loc):
+
+        # This locates a given kpoint in a list, within a given tolerance
+        loclst = list(loc)
+        if self.spline:
+            lst = [list(x) for x in self.kpoints_fine]
+        elif self.reduce_path:
+            lst = [list(x) for x in self.reduced_kpath]
+        else:
+            lst = [list(x) for x in self.kpoints]
+
+        for k,kpoint in enumerate(lst):
+            index = np.allclose(loclst,kpoint)
+            if index==True:
+                print(kpoint)
+                return k
 
 
     def set_xaxis(self,f,x):
@@ -4804,7 +6932,7 @@ class ZPR_plotter(object):
                     for itick, tick in enumerate(f.xaxis.get_majorticklabels()):
                         tick.set_horizontalalignment(self.xticks_alignment[itick]) 
 
-        if self.pgap or self.split_occupied_subspace or self.te_pgap:
+        if self.pgap or self.split_occupied_subspace or self.te_pgap or self.total_pgap:
             lims = (min(self.pressure)-0.1, max(self.pressure)+0.1)
             f.set_xlim(lims)
             f.xaxis.set_major_formatter(FuncFormatter(self.label_formatter))
@@ -5126,6 +7254,7 @@ def plotter(
         gap = False,
         te_pgap = False,
         pgap = False,
+        total_pgap = False,
         vbcb = False,
         separate_bands = False,
         phase_diagram = False,
@@ -5141,6 +7270,9 @@ def plotter(
         zero_gap_value = None,
         zero_gap_units = 'eV',
         experimental_data = None,
+        valence = None,
+        spline = False,
+        spline_factor = 5,
 
         **kwargs):
 
@@ -5210,6 +7342,7 @@ def plotter(
             pgap = pgap,
             vbcb = vbcb,
             te_pgap = te_pgap,
+            total_pgap = total_pgap,
             separate_bands = separate_bands,
             phase_diagram = phase_diagram,
             split = split,
@@ -5221,6 +7354,10 @@ def plotter(
             split_occupied_subspace = split_occupied_subspace,
             modes = modes,
             verbose = verbose,
+            valence = valence,
+
+            spline = spline,
+            spline_factor = spline_factor,
 
             **kwargs)
             
@@ -5278,9 +7415,26 @@ def plotter(
                 if separate_bands:
                     zpr_plot.plot_te_pgap_separate_indirect()
                 else:
-                    raise Exception('plot_te_pgap_indirect not implemented')
+                    zpr_plot.plot_te_pgap_indirect()
+
+                    if phase_diagram:
+                        zpr_plot.plot_phase_diagram()
             else:
-                raise Exception('plot_te_pgap not implemented')
+                raise Exception('plot_te_pgap not implemented for direct gap yet')
+
+        if total_pgap:
+            if indirect:
+                if separate_bands:
+                    zpr_plot.plot_total_pgap_separate_indirect()
+                else:
+                    zpr_plot.plot_total_pgap_indirect()
+
+                    if phase_diagram:
+                        zpr_plot.plot_phase_diagram()
+            else:
+                raise Exception('plot_total_pgap not implemented for direct gap yet')
+
+
 
         if split_occupied_subspace:
             zpr_plot.plot_splitted_subspaces()
