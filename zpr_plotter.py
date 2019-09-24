@@ -248,10 +248,10 @@ class ZPRfile(CDFfile):
             self.indirect_gap_energy_band_split = ncdata.variables['indirect_gap_energy_band_split'][:,:,:]
             self.indirect_gap_ren_band_split = ncdata.variables['indirect_gap_renormalization_band_split'][:,:,:]
 
-            self.fan_occ = ncdata.variables['reduced_fan_occ'][:,:,:,:]
-            self.fan_unocc = ncdata.variables['reduced_fan_unocc'][:,:,:,:]
-            self.ddw_occ = ncdata.variables['reduced_ddw_occ'][:,:,:,:]
-            self.ddw_unocc = ncdata.variables['reduced_ddw_unocc'][:,:,:,:]
+#            self.fan_occ = ncdata.variables['reduced_fan_occ'][:,:,:,:]
+#            self.fan_unocc = ncdata.variables['reduced_fan_unocc'][:,:,:,:]
+#            self.ddw_occ = ncdata.variables['reduced_ddw_occ'][:,:,:,:]
+#            self.ddw_unocc = ncdata.variables['reduced_ddw_unocc'][:,:,:,:]
 
 
             ### Only for split contribution, VB and CB / modes separate ###
@@ -1258,56 +1258,108 @@ class ZPR_plotter(object):
                     h.write('\n{:15s}'.format('  Gap'))
                     for t in range(self.ntemp):
                         h.write('{:>8.4f}   '.format(self.gap_ren[t]))
-
-
-
+####### FROM HERE
+        limms = [[-50.,50.],[-2.,50.],[-90.,40.]]
+##########FIX ME : add default data and if condition
+        limms = [self.cond_ylims, self.val_ylims, self.gap_ylims]
         for i in range(3):
-            self.set_vrefs(_arr[i][0], self.temp, 0.)
+#            lims = _arr[i,0].get_ylim() 
+            ylims = limms[i]    
+            self.set_vrefs(_arr[i][0], self.temp, 0.,style='dashed')
+            _arr[i,0].set_ylim(limms[i])
+
 
             if self.split:
                 self.set_vrefs(_arr2[i][0], self.temp, 0.)
 
         
         self.set_xaxis(_arr[2][0], self.temp)
-        self.set_yaxis(_arr[0][0], 'CB ren ({})'.format(self.gap_units))
-        self.set_yaxis(_arr[1][0], 'VB ren ({})'.format(self.gap_units))
+        self.set_yaxis_separate(_arr[0][0], 'CBM ren ({})'.format(self.gap_units),self.cond_ylims, self.cond_yticks)
+        self.set_yaxis_separate(_arr[1][0], 'VBM ren ({})'.format(self.gap_units),self.val_ylims, self.val_yticks)
+        self.set_yaxis_separate(_arr[2][0], 'Gap ren ({})'.format(self.gap_units),self.gap_ylims, self.gap_yticks)
+
+
+        self.set_yaxis(_arr[0][0], 'CBM ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr[1][0], 'VBM ren ({})'.format(self.gap_units))
         self.set_yaxis(_arr[2][0], 'Gap ren ({})'.format(self.gap_units))
 
+        fig.subplots_adjust(left=0.11,bottom=0.08,right=0.81,top=0.95,wspace=0.2,hspace=0.12)
 
         if self.split:
             self.set_xaxis(_arr2[2][0], self.temp)
-            self.set_yaxis(_arr2[0][0], 'CB ren ({})'.format(self.gap_units))
-            self.set_yaxis(_arr2[1][0], 'VB ren ({})'.format(self.gap_units))
-            self.set_yaxis(_arr2[2][0], 'Gap ren ({})'.format(self.gap_units))
+            self.set_yaxis_separate(_arr2[0][0], 'CB ren ({})'.format(self.gap_units),self.cond_ylims, self.cond_yticks)
+            self.set_yaxis_separate(_arr2[1][0], 'VB ren ({})'.format(self.gap_units),self.val_ylims, self.val_yticks)
+            self.set_yaxis_separate(_arr2[2][0], 'Gap ren ({})'.format(self.gap_units),self.gap_ylims, self.gap_yticks)
 
             self.set_title(_arr[0][0], self.title[0])
             self.set_title(_arr2[0][0], self.title[1])
 
         else:
-            if self.main_title is not None:
-                self.set_title(_arr[0][0], self.main_title)
+            if self.main_title:
+                self.set_title(_arr0[0][0], self.main_title)
 
-###
-
-        self.set_legend_gap(_arr[2][0])
-        if self.main_title is not None:
-            self.set_main_title(fig) 
-
-        if self.split:
-            self.set_legend_gap(_arr2[2][0])
-
-            self.set_title(_arr[0][0], self.title[0])
-            self.set_title(_arr2[0][0], self.title[1])
-
-            if self.main_title is not None:
-                self.set_main_title(fig2)
+        legend1 = _arr[0][0].legend(loc=9,bbox_to_anchor=(0.5,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = file_qty,columnspacing=1)
+        _arr[0][0].add_artist(legend1)
+        
+        fig.subplots_adjust(hspace=0.0,top=0.91,right=0.95,bottom=0.1)
 
         if self.split:
+            fig.align_ylabels()
+            fig2.align_ylabels()
             self.save_figure_split(fig,fig2)
         else:
+            fig.align_ylabels()
             self.save_figure(fig)
 
-        plt.show()
+###### TO HERE
+#
+#        for i in range(3):
+#            self.set_vrefs(_arr[i][0], self.temp, 0.)
+#
+#            if self.split:
+#                self.set_vrefs(_arr2[i][0], self.temp, 0.)
+#
+#        
+#        self.set_xaxis(_arr[2][0], self.temp)
+#        self.set_yaxis(_arr[0][0], 'CB ren ({})'.format(self.gap_units))
+#        self.set_yaxis(_arr[1][0], 'VB ren ({})'.format(self.gap_units))
+#        self.set_yaxis(_arr[2][0], 'Gap ren ({})'.format(self.gap_units))
+#
+#
+#        if self.split:
+#            self.set_xaxis(_arr2[2][0], self.temp)
+#            self.set_yaxis(_arr2[0][0], 'CB ren ({})'.format(self.gap_units))
+#            self.set_yaxis(_arr2[1][0], 'VB ren ({})'.format(self.gap_units))
+#            self.set_yaxis(_arr2[2][0], 'Gap ren ({})'.format(self.gap_units))
+#
+#            self.set_title(_arr[0][0], self.title[0])
+#            self.set_title(_arr2[0][0], self.title[1])
+#
+#        else:
+#            if self.main_title is not None:
+#                self.set_title(_arr[0][0], self.main_title)
+#
+####
+#
+#        self.set_legend_gap(_arr[2][0])
+#        if self.main_title is not None:
+#            self.set_main_title(fig) 
+#
+#        if self.split:
+#            self.set_legend_gap(_arr2[2][0])
+#
+#            self.set_title(_arr[0][0], self.title[0])
+#            self.set_title(_arr2[0][0], self.title[1])
+#
+#            if self.main_title is not None:
+#                self.set_main_title(fig2)
+#
+#        if self.split:
+#            self.save_figure_split(fig,fig2)
+#        else:
+#            self.save_figure(fig)
+
+#        plt.show()
  
     def plot_pgap(self):
 
@@ -3810,6 +3862,7 @@ class ZPR_plotter(object):
 
         file_qty = len(self.te_fnames)
 
+        extrapolate - True
         # Define figure
         fig, _arr = plt.subplots(3,1, figsize=self.figsize, squeeze=False, sharex=True)
 #        plt.subplots_adjust(hspace=0.05, top=0.95) 
@@ -6915,11 +6968,15 @@ class ZPR_plotter(object):
                 f.set_xlim(self.omega_se[0], self.omega_se[-1])
 
         if self.gap:
-            f.set_xlabel('Temperature (K)', fontsize=18)
-            f.xaxis.set_tick_params(labelsize=16)
-            if not self.xlims:
-                self.xlims = [min(x), max(x)]
-            f.set_xlim(self.xlims)
+            cut = 0.02*max(self.temp)
+            lims = (0, 1.01*max(self.temp))
+            f.set_xlim(lims)
+            f.set_xlabel('Temperature (K)', fontsize=24)
+            plt.setp(f.get_xticklabels(), fontsize=20, weight='bold')
+#            f.xaxis.set_tick_params(labelsize=16)
+#            if not self.xlims:
+#                self.xlims = [min(x), max(x)]
+#            f.set_xlim(self.xlims)
 
         if self.vbcb:
             f.set_xlim((0,len(x)-1))
