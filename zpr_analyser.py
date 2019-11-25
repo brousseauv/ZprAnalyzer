@@ -879,8 +879,41 @@ class EigenvalueCorrections(object):
             unpert = self.interpolate_eigenvalues(unpert)
             # Interpolated eig(T)
             tmp = np.zeros((self.nsppol,self.nkpt_fine,self.max_band,self.ntemp))
+            self.spline_reduced_td_ren = np.zeros_like(tmp)
+            self.spline_reduced_eigcorr = np.zeros_like(tmp)
+
             for t in range(self.ntemp):
                 tmp[:,:,:,t] = self.interpolate_eigenvalues(pert[:,:,:,t])
+                self.spline_reduced_td_ren[:,:,:,t] = self.interpolate_corrections(self.reduced_td_ren[:,:,:,t])
+                self.spline_reduced_eigcorr[:,:,:,t] = self.interpolate_corrections(self.reduced_eigcorr[:,:,:,t])
+
+#            import matplotlib.pyplot as plt
+#            fig, arr = plt.subplots(2,1,squeeze=True)
+#
+#            kptarr = np.arange(self.nkpt_fine)
+#            col = ['gray','purple','blue','green','yellow','red']
+#            for t in range(self.ntemp):
+#                arr[0].plot(kptarr, self.spline_reduced_td_ren[0,:,cond,t]*cst.ha_to_ev*1E3, linestyle='dashed',color = col[t])
+#                arr[1].plot(kptarr, self.spline_reduced_td_ren[0,:,val,t]*cst.ha_to_ev*1E3, linestyle = 'dotted',color = col[t])
+#                arr[0].plot(kptarr[::25], self.reduced_td_ren[0,:,cond,t]*cst.ha_to_ev*1E3, linestyle='None',marker='o',color = col[t])
+#                arr[1].plot(kptarr[::25], self.reduced_td_ren[0,:,val,t]*cst.ha_to_ev*1E3, linestyle='None',marker='s',color = col[t])
+#            #    arr[0].plot(kptarr[::25], self.reduced_eigcorr[0,:,cond,t]*cst.ha_to_ev*1E3, linestyle='None',marker='o',color = col[t])
+#            #    arr[1].plot(kptarr[::25], self.reduced_eigcorr[0,:,val,t]*cst.ha_to_ev*1E3, linestyle='None',marker='s',color = col[t])
+#
+#            for i in range(2):
+#                lim = arr[i].get_ylim()
+#                arr[i].plot(262*np.ones((10)), np.linspace(lim[0],lim[1],10),'k')
+#            plt.suptitle('5GPa')
+#
+#            #plt.savefig('quadratic_spline_for_eigcorr_3gpa.png')
+#            #plt.savefig('cubic_spline_for_eigcorr_3gpa.png')
+#            plt.savefig('cubic_spline_for_correction_5gpa.png')
+#            #plt.savefig('quadratic_spline_for_correction_3gpa.png')
+#
+#
+#
+#            plt.show()
+
 
             pert = tmp
 
@@ -1130,6 +1163,12 @@ class EigenvalueCorrections(object):
 
         self.kpoints_fine = kpts
 
+#        with open('kpts_fine_spline_pc2.txt','w') as f:
+#
+#            for k in range(self.nkpt_fine):
+#                f.write('{:>9.7e}  {:>9.7e}  {:9.7e}\n'.format(kpts[k,0], kpts[k,1], kpts[k,2]))
+#
+#            f.close()
         return
 
     def interpolate_eigenvalues(self,eig0):
@@ -1154,6 +1193,36 @@ class EigenvalueCorrections(object):
              eig[0,:,j] = spl(xfine)
 
          return eig
+
+    def interpolate_corrections(self,corr):
+
+         if self.reduce_path:
+             nkpt = self.reduced_nkpt
+         else:
+             nkpt = self.nkpt
+
+         x = np.arange(nkpt)
+         xfine = np.linspace(x[0],x[-1],self.nkpt_fine)
+
+         if self.nsppol is None:
+             self.nsppol = corr.nsppol
+         if self.max_band is None:
+             self.max_band = corr.max_band
+
+         eig = np.zeros((self.nsppol,self.nkpt_fine,self.max_band))
+
+         aindex = self.find_kpt_index(self.split_kpt)
+
+         for j in range(self.max_band):
+             #spl = interp1d(x[:11],corr[0,:11,j], kind='quadratic')
+             spl = interp1d(x[:11],corr[0,:11,j], kind='cubic')
+             eig[0,:aindex+1,j] = spl(xfine[:aindex+1])
+             #spl = interp1d(x[10:],corr[0,10:,j], kind='quadratic')
+             spl = interp1d(x[10:],corr[0,10:,j], kind='cubic')
+             eig[0,aindex+1:,j] = spl(xfine[aindex+1:])
+
+         return eig
+
 
     def find_kpt_index(self, loc):
 
@@ -1364,6 +1433,8 @@ class EigenvalueCorrections(object):
             dts.createDimension('number_of_spins', self.nsppol)
             dts.createDimension('number_of_atoms', self.natom) 
             dts.createDimension('number_of_kpoints', self.nkpt)
+            if self.spline:
+                dts.createDimension('number_of_fine_kpoints',self.nkpt_fine)
             dts.createDimension('number_of_bands', self.max_band)
             dts.createDimension('number_of_bands_contr', self.nband_contr)
             dts.createDimension('number_of_frequencies', self.nfreq)
@@ -1403,6 +1474,16 @@ class EigenvalueCorrections(object):
             data = dts.createVariable('eigenvalue_corrections', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_temperatures'))
             data.units = "Hartree"
             data[:,:,:,:] = self.td_ren[:,:,:,:]
+
+            if self.spline:
+                data = dts.createVariable('eigenvalue_corrections_spline_interpolation', 'd', ('number_of_spins','number_of_fine_kpoints','number_of_bands','number_of_temperatures'))
+                data.units = 'Hartree'
+                data[:,:,:,:] = self.spline_reduced_td_ren[:,:,:,:]
+
+                data = dts.createVariable('corrected_eigenvalue_spline_interpolation', 'd', ('number_of_spins','number_of_fine_kpoints','number_of_bands','number_of_temperatures'))
+                data.units = 'Hartree'
+                data[:,:,:,:] = self.spline_reduced_eigcorr[:,:,:,:]
+
 
             data = dts.createVariable('eigenvalue_corrections_modes', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_modes'))
             data.units = "Hartree"

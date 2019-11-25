@@ -4243,14 +4243,20 @@ class ZPR_plotter(object):
 
         
         self.set_xaxis(_arr[2][0], self.pressure)
-        self.set_yaxis_separate(_arr[0][0], 'CB ren ({})'.format(self.gap_units),self.cond_ylims, self.cond_yticks)
-        self.set_yaxis_separate(_arr[1][0], 'VB ren ({})'.format(self.gap_units),self.val_ylims, self.val_yticks)
+        self.set_yaxis_separate(_arr[0][0], 'CBM ren ({})'.format(self.gap_units),self.cond_ylims, self.cond_yticks)
+        self.set_yaxis_separate(_arr[1][0], 'VBM ren ({})'.format(self.gap_units),self.val_ylims, self.val_yticks)
         self.set_yaxis_separate(_arr[2][0], 'Gap ren ({})'.format(self.gap_units),self.gap_ylims, self.gap_yticks)
 
 
-        self.set_yaxis(_arr[0][0], 'CB ren ({})'.format(self.gap_units))
-        self.set_yaxis(_arr[1][0], 'VB ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr[0][0], 'CBM ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr[1][0], 'VBM ren ({})'.format(self.gap_units))
         self.set_yaxis(_arr[2][0], 'Gap ren ({})'.format(self.gap_units))
+
+        # Custum stuff
+        _arr[2][0].text(0.7,-48, r'$\mathbb{Z}_2\!=\!0$', fontsize=24,color='k')
+        _arr[2][0].text(3.8, -48, r'$\mathbb{Z}_2\!=\!1$',fontsize = 24,color='k')
+        _arr[2][0].text(1.85,-25,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
+        _arr[2][0].text(1.35,-25,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
 
 #        if self.main_title:
 #            self.set_title(_arr[0][0], self.main_title)
