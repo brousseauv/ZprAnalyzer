@@ -1639,6 +1639,7 @@ class ZPR_plotter(object):
         # Define figure
         only=True  # only the Egap(P) for each T. If False, add gap renorm on top subplot
         extrapolate_bands = True # for now, default extrapolates on the TOTAL GAP REN, not bands separately...
+        #when exprapolation on bands work properly, remove the other option. This should be the default. 
 
         if only:
             fig, _arr = plt.subplots(1,1, figsize=self.figsize, squeeze=False, sharex=True)
@@ -3251,11 +3252,11 @@ class ZPR_plotter(object):
 
             # Initialize plotting arrays
             if ifile==0:
-                if self.split: # distinct data for left and rifht gap
+                if self.split: # distinct data for left and right gap
                     self.full_gap_ren = np.zeros((file_qty, self.ntemp,2))
                     self.full_band_ren = np.zeros((file_qty,self.ntemp,2,2)) # file, temp, vbcb, lr 
                     self.ref_temp = self.temp
-                if self.split2: # single array, left gap for trovoal phase and right gap for topol phase
+                if self.split2: # single array, left gap for trivial phase and right gap for topol phase
                     self.full_gap_ren = np.zeros((file_qty, self.ntemp))
                     self.full_band_ren = np.zeros((file_qty,self.ntemp,2))
                     self.ref_temp = self.temp
@@ -3300,6 +3301,8 @@ class ZPR_plotter(object):
 
                         self.extr_full_gap_ren1 = np.zeros((len(self.extr_pressure1), self.ntemp,2)) #pressure, temperature, val/cond
                         self.extr_full_gap_ren2 = np.zeros((len(self.extr_pressure2), self.ntemp,2))
+                        #self.extr_full_gap_ren_spline1 = np.zeros((len(self.extr_pressure1), self.ntemp,2)) #pressure, temperature, val/cond
+                        #self.extr_full_gap_ren_spline2 = np.zeros((len(self.extr_pressure2), self.ntemp,2))
 
 
 #############################################
@@ -3357,6 +3360,9 @@ class ZPR_plotter(object):
             #                        x0,x1 = np.polyfit(self.extr_pressure1,self.extr_full_gap_energy1[:,T],1)
             #                        print('trivial side : {} GPa'.format(-x1/x0))
             #                        self.pc1[T] = -x1/x0
+                                #ftriv = interp1d(self.pressure[:crit_index+1], self.full_band_ren[:crit_index+1,T,b], kind='slinear',bounds_error=False, fill_value='extrapolate')
+                                #self.extr_full_gap_ren_spline1[:,T,b] = ftriv(self.extr_pressure1)
+
                                 # topol side
                                 x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_band_ren[crit_index+1:crit_index+3,T,b], 1)
                                 self.extr_full_gap_ren2[:,T,b] = x1 + x0*self.extr_pressure2
@@ -3364,6 +3370,8 @@ class ZPR_plotter(object):
             #                        x0,x1 = np.polyfit(self.extr_pressure2,self.extr_full_gap_energy2[:,T],1)
             #                        print('topol side : {} GPa'.format(-x1/x0))
             #                        self.pc2[T] = -x1/x0
+                                #ftopo = interp1d(self.pressure[crit_index+1:], self.full_band_ren[crit_index+1:,T,b], kind='slinear',bounds_error=False, fill_value='extrapolate')
+                                #self.extr_full_gap_ren_spline2[:,T,b] = ftopo(self.extr_pressure2)
 
 
 
@@ -3420,6 +3428,16 @@ class ZPR_plotter(object):
                         _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T,1], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
                         _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T,0], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
                         _arr[2,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T,1]-self.extr_full_gap_ren2[:,T,0], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+
+                            ## This is just to test spline interpolation. It gives shit when extrapolating. 
+#                        _arr[0,0].plot(self.extr_pressure1, self.extr_full_gap_ren_spline1[:,T,1], linestyle='dotted', linewidth=2.0, label = None, color = 'k')
+#                        _arr[1,0].plot(self.extr_pressure1, self.extr_full_gap_ren_spline1[:,T,0], linestyle='dotted', linewidth=2.0, label = None, color = 'k')
+#                        _arr[2,0].plot(self.extr_pressure1, self.extr_full_gap_ren_spline1[:,T,1]-self.extr_full_gap_ren_spline1[:,T,0], linestyle='--', linewidth=2.0, label = None, color = 'k')
+#
+#                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren_spline2[:,T,1], linestyle='dotted', linewidth=2.0, label = None, color = 'k')
+#                        _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_ren_spline2[:,T,0], linestyle='dotted', linewidth=2.0, label = None, color = 'k')
+#                        _arr[2,0].plot(self.extr_pressure2, self.extr_full_gap_ren_spline2[:,T,1]-self.extr_full_gap_ren_spline2[:,T,0], linestyle='--', linewidth=2.0, label = None, color = 'k')
+ 
  
             else:
                 if self.split:
@@ -7573,7 +7591,6 @@ def plotter(
 
             spline = spline,
             spline_factor = spline_factor,
-
             extrapolate_ren = extrapolate_ren,
 
             **kwargs)
