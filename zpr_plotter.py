@@ -151,6 +151,14 @@ class TEfile(CDFfile):
 #            self.indirect_gap_energy_band = ncdata.variables['indirect_gap_energy_band'][:,:]
             self.indirect_gap_ren_band = ncdata.variables['te_renorm_indirect_band'][:,:]
 
+
+            status = root.get_variables_by_attributes(name='corrected_eigenvalue_spline_interpolation')
+            if status != []:
+                self.eigcorr_spline = ncdata.variables['corrected_eigenvalue_spline_interpolation'][:,:,:,:]
+            status = root.get_variables_by_attributes(name='eigenvalue_corrections_spline_interpolation')
+            if status != []:
+                self.td_ren_spline = ncdata.variables['eigenvalue_corrections_spline_interpolation'][:,:,:,:]
+
 #            self.unperturbed_indirect_gap_location_split = ncdata.variables['unperturbed_indirect_gap_location_split'][:,:,:]
 #            self.indirect_gap_location_split = ncdata.variables['indirect_gap_location_split'][:,:,:,:]
 #            self.unperturbed_indirect_gap_energy_split = ncdata.variables['unperturbed_indirect_gap_energy_split'][:,:]
@@ -1680,7 +1688,7 @@ class ZPR_plotter(object):
             
         ####### Define critical pressure index, for plotting                                                                                                                                            
         if self.crit_pressure is not None:
-            crit_index = self.find_crit_pressure()
+            crit_index = self.find_crit_pressure(self.crit_pressure, self.pressure)
         else:
             crit_index = None
     #        print(crit_index)
@@ -1746,6 +1754,7 @@ class ZPR_plotter(object):
                 self.gap_location = self.zpr.indirect_gap_location
                 self.gap_energy = self.zpr.indirect_gap_energy
                 self.gap_ren = self.zpr.indirect_gap_ren
+                self.band_ren = self.zpr.indirect_gap_ren_band
 
                 if self.unpert:
                     gap_index0 = np.zeros((2),dtype = int)
@@ -1769,6 +1778,8 @@ class ZPR_plotter(object):
                 else:
                     self.full_gap_energy = np.zeros((file_qty, self.ntemp))
                     self.full_gap_ren = np.zeros((file_qty, self.ntemp))
+                    self.full_band_ren = np.zeros((file_qty, self.ntemp,2))
+
                     self.ref_temp = self.temp
                     self.full_energy0 = np.zeros((file_qty))
             else:
@@ -1795,10 +1806,10 @@ class ZPR_plotter(object):
 
                         '''why do I do this?!?'''
                         self.extr_pressure1 = np.concatenate((pressure1, tmparr))
-                        self.extr_pressure2 = np.concatenate((pressure2,tmparr2))
+                        self.extr_pressure2 = np.concatenate((tmparr2,pressure2))
 
-                        self.extr_full_gap_ren1 = np.zeros((len(self.extr_pressure1), self.ntemp,2)) #pressure, temperature, val/cond
-                        self.extr_full_gap_ren2 = np.zeros((len(self.extr_pressure2), self.ntemp,2))
+                        self.extr_full_band_ren1 = np.zeros((len(self.extr_pressure1), self.ntemp,2)) #pressure, temperature, val/cond
+                        self.extr_full_band_ren2 = np.zeros((len(self.extr_pressure2), self.ntemp,2))
 
 #            print(self.gap_energy)
             if self.split:
@@ -1824,11 +1835,12 @@ class ZPR_plotter(object):
             else:
                 self.full_gap_energy[ifile,:] = self.gap_energy
                 self.full_gap_ren[ifile,:] = self.gap_ren
+                self.full_band_ren[ifile,:,:] = self.band_ren
                 if not self.gap_fname:
                     self.full_energy0[ifile] = self.energy0
                 else:
                     p_index = self.find_pressure_index(self.pressure[ifile])
-                    print(p_index)
+                    #print(p_index)
                     self.full_energy0[ifile] = self.explicit_gap_energies[p_index]
 
             if self.gap_fname is not None:
@@ -1842,11 +1854,13 @@ class ZPR_plotter(object):
                  #   self.full_energy0[ifile] = self.explicit_gap_energies[ifile]
                     self.full_gap_energy[ifile,:] =  self.full_gap_ren[ifile,:] + np.ones(self.ntemp)*self.full_energy0[ifile]
 
+        #### End of loop on files. All data is stored now.
 
 #        if self.crit_pressure is not None:
 #            crit_index = self.find_temp_index()
         if self.gap_fname is not None:
-            crit_index2 = self.find_temp_index2(self.explicit_pressures)
+#            crit_index2 = self.find_temp_index2(self.explicit_pressures)
+            crit_index2 = self.find_crit_pressure(self.crit_pressure2,self.explicit_pressures)
             print('crit_index2',crit_index2)
 #        else:
 #            crit_index = None
@@ -1862,20 +1876,28 @@ class ZPR_plotter(object):
             pressure1 = np.arange(1.5,2.0,0.1)
             tmparr = np.arange(2.1,2.6,0.1) # change 2.2 to 2.6 foir full BZ
             self.extr_pressure2 = np.arange(2.3, 3.0, 0.1)
+            self.extr_pressure1 = np.concatenate((pressure1, tmparr))
+        # For extrabolate_bands, it was done earlier.
 
         # linearize unperturbed gap energy to extrapolate inside WSM phase
         y0,y1 = np.polyfit(self.explicit_pressures[15:20], self.explicit_gap_energies[15:20],1)
         tmp2 = y1 + tmparr*y0
-        self.extr_pressure1 = np.concatenate((pressure1, tmparr))
 
 
         if not extrapolate_bands:
+            #for extrapolate bands, most of it was done earlier
             self.extr_full_gap_ren1 = np.zeros((len(self.extr_pressure1), self.ntemp))
             self.extr_full_gap_ren2 = np.zeros((len(self.extr_pressure2), self.ntemp))
             self.extr_full_gap_energy1 = np.zeros((len(self.extr_pressure1), self.ntemp))
             self.extr_full_gap_energy2 = np.zeros((len(self.extr_pressure2), self.ntemp))
             extr_energy01 = np.zeros((len(pressure1)))
             self.extr_full_energy02 = np.zeros((len(self.extr_pressure2)))
+        else:
+            extr_energy01 = np.zeros((len(pressure1)))
+            self.extr_full_energy02 = np.zeros((len(self.extr_pressure2)))
+            self.extr_full_gap_energy1 = np.zeros((len(self.extr_pressure1), self.ntemp))
+            self.extr_full_gap_energy2 = np.zeros((len(self.extr_pressure2), self.ntemp))
+
 
         # Get full_gap_energy0 from explicit data
         ''' add  a  if explicit_energies is not None???'''
@@ -1896,32 +1918,30 @@ class ZPR_plotter(object):
         for T in range(self.ntemp):
 
             if extrapolate_bands:
-                 if extrapolate:                                                                                                                                                                 
-                     if self.split:
-                         raise Exception('split is not implemented yet for extrapolation!!! How did you get here?!?')
-                     elif self.split2:
-                         raise Exception('split2 is not implemented yet for extrapolation!!! How did you get here?!?')
-                     else:
+                 if self.split:
+                     raise Exception('split is not implemented yet for extrapolation!!! How did you get here?!?')
+                 elif self.split2:
+                     raise Exception('split2 is not implemented yet for extrapolation!!! How did you get here?!?')
+                 else:
 
-                         #loop on val and cond extremas
-                         for b in range(2):
-                             #trivial side
-                             x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_band_ren[crit_index-1:crit_index+1,T,b], 1)
-                             self.extr_full_gap_ren1[:,T,b] = x1 + x0*self.extr_pressure1
-         #                        x0,x1 = np.polyfit(self.extr_pressure1,self.extr_full_gap_energy1[:,T],1)
-         #                        print('trivial side : {} GPa'.format(-x1/x0))
-         #                        self.pc1[T] = -x1/x0
-                             # topol side
-                             x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_band_ren[crit_index+1:crit_index+3,T,b], 1)
-                             self.extr_full_gap_ren2[:,T,b] = x1 + x0*self.extr_pressure2
-         #                        x0,x1 = np.polyfit(self.extr_pressure2,self.extr_full_gap_energy2[:,T],1)
-         #                        print('topol side : {} GPa'.format(-x1/x0))
-         #                        self.pc2[T] = -x1/x0
-                        
-                         
-                         self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T,1]-self.extr_full_gap_ren1[:,T,0]
-                         '''first, check what the pot is giving. Then, figure out how to get the intersect...'''
-                         self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]-self.extr_full_gap_ren2[:,T,0]
+                     #loop on val and cond extremas
+                     for b in range(2):
+                         #trivial side
+                         x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_band_ren[crit_index-1:crit_index+1,T,b], 1)
+                         self.extr_full_band_ren1[:,T,b] = x1 + x0*self.extr_pressure1
+     #                        x0,x1 = np.polyfit(self.extr_pressure1,self.extr_full_gap_energy1[:,T],1)
+     #                        print('trivial side : {} GPa'.format(-x1/x0))
+                         self.pc1[T] = -x1/x0
+                         # topol side
+                         x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_band_ren[crit_index+1:crit_index+3,T,b], 1)
+                         self.extr_full_band_ren2[:,T,b] = x1 + x0*self.extr_pressure2
+     #                        x0,x1 = np.polyfit(self.extr_pressure2,self.extr_full_gap_energy2[:,T],1)
+     #                        print('topol side : {} GPa'.format(-x1/x0))
+                         self.pc2[T] = -x1/x0
+                    
+                     self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_band_ren1[:,T,1]-self.extr_full_band_ren1[:,T,0]
+                     '''first, check what the plot is giving. Then, figure out how to get the intersect...'''
+                     self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_band_ren2[:,T,1]-self.extr_full_band_ren2[:,T,0]
 
             else:
                 if self.split:
@@ -2116,7 +2136,7 @@ class ZPR_plotter(object):
              #       _arr22[0][0].plot(self.pressure[s:], self.full_energy0[s:],marker='d', color='black')
 
 #########################################
-       #-------- crit_index but no split or split2
+       #-------- crit_index is defined but no split or split2
                 else:
                     if T==self.temp[0]:
                         ###### FIX ME : keep explicit_pressures and explicit_gap_energies, just get a new crit index for this array! 
@@ -2191,6 +2211,8 @@ class ZPR_plotter(object):
                     if only:
                         _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
                         _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        print(self.extr_full_gap_energy2[:,T])
+                        print(self.extr_pressure2)
 
                     else:
                         _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
@@ -3172,7 +3194,7 @@ class ZPR_plotter(object):
 
 ####### Define critical pressure index, for plotting
         if self.crit_pressure is not None:
-            crit_index = self.find_crit_pressure()
+            crit_index = self.find_crit_pressure(self.crit_pressure, self.pressure)
         else:
             crit_index = None
 #        print(crit_index)
@@ -3344,39 +3366,45 @@ class ZPR_plotter(object):
                             print(self.full_gap_ren[ifile,T],self.full_band_ren[ifile,T,0],self.full_band_ren[ifile,T,1],self.full_band_ren[ifile,T,1]-self.full_band_ren[ifile,T,0])
                             print(self.gap_location[T], self.kpoints[gap_index])
 
-                if self.extrapolate_ren:
-                        if self.split:
-                            raise Exception('split is not implemented yet for extrapolation!!! How did you get here?!?')
-                        elif self.split2:
-                            raise Exception('split2 is not implemented yet for extrapolation!!! How did you get here?!?')
-                        else:
+    # End loop on files. All data is stored now.
+        if self.extrapolate_ren:
+                if self.split:
+                    raise Exception('split is not implemented yet for extrapolation!!! How did you get here?!?')
+                elif self.split2:
+                    raise Exception('split2 is not implemented yet for extrapolation!!! How did you get here?!?')
+                else:
 
-                            #loop on val and cond extremas
-                            for b in range(2):
-                                #trivial side
-                                x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_band_ren[crit_index-1:crit_index+1,T,b], 1)
-                                self.extr_full_gap_ren1[:,T,b] = x1 + x0*self.extr_pressure1
-            #                        self.extr_full_gap_energy1[:,T,b] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T,b]
-            #                        x0,x1 = np.polyfit(self.extr_pressure1,self.extr_full_gap_energy1[:,T],1)
-            #                        print('trivial side : {} GPa'.format(-x1/x0))
-            #                        self.pc1[T] = -x1/x0
-                                #ftriv = interp1d(self.pressure[:crit_index+1], self.full_band_ren[:crit_index+1,T,b], kind='slinear',bounds_error=False, fill_value='extrapolate')
-                                #self.extr_full_gap_ren_spline1[:,T,b] = ftriv(self.extr_pressure1)
+                    for T in range(self.ntemp):
 
-                                # topol side
-                                x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_band_ren[crit_index+1:crit_index+3,T,b], 1)
-                                self.extr_full_gap_ren2[:,T,b] = x1 + x0*self.extr_pressure2
-            #                        self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
-            #                        x0,x1 = np.polyfit(self.extr_pressure2,self.extr_full_gap_energy2[:,T],1)
-            #                        print('topol side : {} GPa'.format(-x1/x0))
-            #                        self.pc2[T] = -x1/x0
-                                #ftopo = interp1d(self.pressure[crit_index+1:], self.full_band_ren[crit_index+1:,T,b], kind='slinear',bounds_error=False, fill_value='extrapolate')
-                                #self.extr_full_gap_ren_spline2[:,T,b] = ftopo(self.extr_pressure2)
+                        #loop on val and cond extremas
+                        print(self.ref_temp[T])
+                        for b in range(2):
+                            #trivial side
+                            x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_band_ren[crit_index-1:crit_index+1,T,b], 1)
+                            self.extr_full_gap_ren1[:,T,b] = x1 + x0*self.extr_pressure1
+                            print(x0,x1)
+        #                        self.extr_full_gap_energy1[:,T,b] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T,b]
+        #                        x0,x1 = np.polyfit(self.extr_pressure1,self.extr_full_gap_energy1[:,T],1)
+        #                        print('trivial side : {} GPa'.format(-x1/x0))
+        #                        self.pc1[T] = -x1/x0
+                            #ftriv = interp1d(self.pressure[:crit_index+1], self.full_band_ren[:crit_index+1,T,b], kind='slinear',bounds_error=False, fill_value='extrapolate')
+                            #self.extr_full_gap_ren_spline1[:,T,b] = ftriv(self.extr_pressure1)
+
+                            # topol side
+                            x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_band_ren[crit_index+1:crit_index+3,T,b], 1)
+                            self.extr_full_gap_ren2[:,T,b] = x1 + x0*self.extr_pressure2
+                            print(x0,x1)
+
+        #                        self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
+        #                        x0,x1 = np.polyfit(self.extr_pressure2,self.extr_full_gap_energy2[:,T],1)
+        #                        print('topol side : {} GPa'.format(-x1/x0))
+        #                        self.pc2[T] = -x1/x0
+                            #ftopo = interp1d(self.pressure[crit_index+1:], self.full_band_ren[crit_index+1:,T,b], kind='slinear',bounds_error=False, fill_value='extrapolate')
+                            #self.extr_full_gap_ren_spline2[:,T,b] = ftopo(self.extr_pressure2)
 
 
 
-    #                print(ifile, T, gap_index)
-        # End loop on files. All data is stored now.
+#                print(ifile, T, gap_index)
 
 #############################################
         # Start plotting
@@ -6817,14 +6845,14 @@ class ZPR_plotter(object):
             else:
                 return None
 
-    def find_crit_pressure(self):
+    def find_crit_pressure(self, crit_pressure, pressure):
         if self.pgap or self.te_pgap or self.total_pgap:
-            lst = list(self.pressure)
-            if self.crit_pressure in lst:
-                return lst.index(self.crit_pressure)
+            lst = list(pressure)
+            if crit_pressure in lst:
+                return lst.index(crit_pressure)
             else:
-                for i in range(len(self.pressure)-1):
-                    if self.pressure[i]<self.crit_pressure and self.crit_pressure < self.pressure[i+1]:
+                for i in range(len(pressure)-1):
+                    if pressure[i]<crit_pressure and crit_pressure < pressure[i+1]:
                         return i
                 return None
 
@@ -6852,7 +6880,7 @@ class ZPR_plotter(object):
 
     def find_pressure_index(self, p):
 
-        if self.explicit_pressures:
+        if self.explicit_pressures is not None:
             pressure = self.explicit_pressures
         else:
             pressure = self.pressure
