@@ -77,6 +77,37 @@ class GAPfile(CDFfile):
             self.explicit_pressures = ncdata.variables['pressures'][:]
             self.explicit_gap_energies_units = ncdata.variables['gap_energies'].getncattr('units')
 
+class EIGfile(CDFfile):
+
+    def __init__(self, *args, **kwargs):
+
+        super(EIGfile, self).__init__(*args, **kwargs)
+        self.eig0 = None
+        self.kpoints = None
+
+    # Open the EIG.nc file and read it
+    def read_nc(self, fname=None):
+
+        fname = fname if fname else self.fname
+        super(EIGfile, self).read_nc(fname)
+
+        with nc.Dataset(fname, 'r') as ncdata:
+            
+            self.eig0 = ncdata.variables['Eigenvalues'][:,:,:]
+            self.kpoints = ncdata.variables['Kptns'][:,:]
+
+    @property
+    def nsppol(self):
+        return self.eig0.shape[0] if self.eig0 is not None else None
+
+    @property
+    def nkpt(self):
+        return self.eig0.shape[1] if self.eig0 is not None else None
+    
+    @property
+    def max_band(self):
+        return self.eig0.shape[2] if self.eig0 is not None else None
+
 class EXPfile(CDFfile):
 
     def __init__(self, *args, **kwargs):
@@ -110,6 +141,7 @@ class TEfile(CDFfile):
         self.kpoints = None
         self.temp = None
         self.eigcorr = None
+        self.kpoints_spline = None
 
     # Open the ZPR.nc file and read it
     def read_nc(self, fname = None):
@@ -152,13 +184,7 @@ class TEfile(CDFfile):
             self.indirect_gap_ren_band = ncdata.variables['te_renorm_indirect_band'][:,:]
 
 
-            status = ncdata.get_variables_by_attributes(name='corrected_eigenvalue_spline_interpolation')
-            if status != []:
-                self.eigcorr_spline = ncdata.variables['corrected_eigenvalue_spline_interpolation'][:,:,:,:]
-            status = ncdata.get_variables_by_attributes(name='eigenvalue_corrections_spline_interpolation')
-            if status != []:
-                self.td_ren_spline = ncdata.variables['eigenvalue_corrections_spline_interpolation'][:,:,:,:]
-
+            
 #            self.unperturbed_indirect_gap_location_split = ncdata.variables['unperturbed_indirect_gap_location_split'][:,:,:]
 #            self.indirect_gap_location_split = ncdata.variables['indirect_gap_location_split'][:,:,:,:]
 #            self.unperturbed_indirect_gap_energy_split = ncdata.variables['unperturbed_indirect_gap_energy_split'][:,:]
@@ -184,6 +210,7 @@ class TEfile(CDFfile):
     def ntemp(self):
         return np.int(self.temp.shape[0]) if self.temp is not None else None
 
+
 class ZPRfile(CDFfile):
         
     def __init__(self, *args, **kwargs):
@@ -199,6 +226,7 @@ class ZPRfile(CDFfile):
         self.spectral_function = None
         self.broadening = None
         self.smearing = None
+        self.kpoints_spline = None
 
     # Open the ZPR.nc file and read it
     def read_nc(self, fname = None):
@@ -261,6 +289,16 @@ class ZPRfile(CDFfile):
 #            self.ddw_occ = ncdata.variables['reduced_ddw_occ'][:,:,:,:]
 #            self.ddw_unocc = ncdata.variables['reduced_ddw_unocc'][:,:,:,:]
 
+            status = ncdata.get_variables_by_attributes(name='corrected_eigenvalue_spline_interpolation')
+            if status != []:
+                self.eigcorr_spline = ncdata.variables['corrected_eigenvalue_spline_interpolation'][:,:,:,:]
+            status = ncdata.get_variables_by_attributes(name='eigenvalue_corrections_spline_interpolation')
+            if status != []:
+                self.td_ren_spline = ncdata.variables['eigenvalue_corrections_spline_interpolation'][:,:,:,:]
+            status = ncdata.get_variables_by_attributes(name='reduced_coordinated_of_kpoints_spline')
+            if status != []:
+                self.kpoints_spline = ncdata.variables['reduced_coordinated_of_kpoints_spline'][:,:]
+
 
             ### Only for split contribution, VB and CB / modes separate ###
 
@@ -279,6 +317,10 @@ class ZPRfile(CDFfile):
     @property
     def nkpt(self):
         return self.eig0.shape[1] if self.eig0 is not None else None
+
+    @property
+    def nkpt_spline(self):
+        return np.int(self.kpoints_spline.shape[0]) if self.kpoints_spline is not None else None
 
     @property
     def max_band(self):
@@ -310,6 +352,7 @@ class ZPR_plotter(object):
     # Input file
     zpr_fnames = list()
     te_fnames = None
+    bare_fnames = None
     gap_fname = None
         
     # Parameters
@@ -401,6 +444,7 @@ class ZPR_plotter(object):
     expdata = None
     zero_gap_units = 'eV'
     extrapolate_ren = False
+    read_correction_from_spline = False
 
     def __init__(self,
 
@@ -473,6 +517,7 @@ class ZPR_plotter(object):
             zero_gap_value = None,
             zero_gap_units = 'eV',
             extrapolate_ren = False,
+            read_correction_from_spline = False,
 
             # Parameters
             nsppol = None,
@@ -502,6 +547,7 @@ class ZPR_plotter(object):
             zpr_fnames = list(),
             te_fnames = None,
             gap_fname = None,
+            bare_fnames = None,
             
             **kwargs):
 
@@ -509,6 +555,7 @@ class ZPR_plotter(object):
         self.zpr_fnames = zpr_fnames
         self.gap_fname = gap_fname
         self.te_fnames = te_fnames
+        self.bare_fnames = bare_fnames
 
 
         # Define options
@@ -551,6 +598,7 @@ class ZPR_plotter(object):
         self.spline = spline
         self.spline_factor = spline_factor
         self.extrapolate_ren = extrapolate_ren
+        self.read_correction_from_spline = read_correction_from_spline
 
         self.verbose = verbose
         self.zero_gap_value = zero_gap_value 
@@ -5462,6 +5510,7 @@ class ZPR_plotter(object):
 
         # Define figure
         only=True  # only the Egap(P) for each T. If False, add gap renorm on top subplot
+        extrapolate_bands = True
 
         if only:
             fig, _arr = plt.subplots(1,1, figsize=self.figsize, squeeze=False, sharex=True)
@@ -5506,36 +5555,59 @@ class ZPR_plotter(object):
         if not self.band_numbers:
             raise Exception('Must provide valence and conduction band numbers vis band_numbers')
 
+        if self.bare_fnames is not None:
+            if len(self.bare_fnames) != file_qty:
+                raise Exception('bare_fnames and zpr_fnames must contain the same number of files, but bare_fnames has {} and zpr_fnames has {}.'.format(len(self.bare_fnames), file_qty))
 
+
+        figt,arrt = plt.subplots(5,6,figsize=(20,15))
+        #figB, arrB = plt.subplots(1,1,squeeze=True,figsize=self.figsize)
+        #colB = col = ['slategray','purple','blue','green','yellow','red']
         # Read and treat all input files
         for ifile in range(file_qty):
                 
+            print('file #',ifile+1)
             # Define file class
             zpr_file = ZPRfile(self.zpr_fnames[ifile], read=False)
             zpr_file.read_nc()
             te_file = TEfile(self.te_fnames[ifile], read=False)
             te_file.read_nc()
+            if self.bare_fnames is not None:
+                bare_file = EIGfile(self.bare_fnames[ifile], read=False)
+                bare_file.read_nc()
 
 
             # Set parameters for this file
             self.nsppol = zpr_file.nsppol
-            self.nkpt = zpr_file.nkpt
             self.max_band = te_file.max_band
             self.ntemp = zpr_file.ntemp
             self.temp = zpr_file.temp
-            self.kpoints = zpr_file.kpoints
+            if self.read_correction_from_spline:
+                self.kpoints = zpr_file.kpoints_spline
+                zpr_correction = zpr_file.td_ren_spline
+                self.nkpt = zpr_file.nkpt_spline
+            else:
+                self.kpoints = zpr_file.kpoints
+                zpr_correction = zpr_file.correction
+                self.nkpt = zpr_file.nkpt
+
             if self.units == 'eV':
-                self.eig0 = zpr_file.eig0*cst.ha_to_ev
-                zpr_file.correction = zpr_file.correction*cst.ha_to_ev
+                zpr_eig0 = zpr_file.eig0*cst.ha_to_ev
+                zpr_correction = zpr_correction*cst.ha_to_ev
             elif self.units == 'meV':
-                self.eig0 = zpr_file.eig0*cst.ha_to_ev*1000
-                zpr_file.correction = zpr_file.correction*cst.ha_to_ev*1E3
+                zpr_eig0 = te_file.eig0*cst.ha_to_ev*1000
+                zpr_correction = zpr_correction*cst.ha_to_ev*1E3
+
+            print('EPI: ', zpr_file.indirect_gap_ren)
+            #if ifile==4:
+            #    print('Gap location, EPI:',zpr_file.indirect_gap_location[0,:,:])
+            #    print('Gap location, TE:',te_file.indirect_gap_location[0,:,:])
 
             # Checkups, put in a separate function...
             if te_file.nsppol != self.nsppol:
                 raise Exception('zpr and te files (index {}) do not have the same nsppol.'.format(ifile))
             if te_file.nkpt != self.nkpt:
-                raise Exception('zpr and te files (index {}) do not have the same nkpt.'.format(ifile))
+                raise Exception('zpr and te files (index {}) do not have the same nkpt. Did you want to read EPI correction from spline interpolation?'.format(ifile))
             if zpr_file.max_band != self.max_band:
                 zpr_max_band = zpr_file.max_band
             else:
@@ -5545,10 +5617,11 @@ class ZPR_plotter(object):
                 raise Exception('zpr and te files (index {}) do not have the same ntemp.'.format(ifile))
             if not np.array_equal(te_file.temp, self.temp):
                 raise Exception('zpr and te files (index {}) do not have the same temperature array.'.format(ifile))
-            if not np.array_equal(te_file.kpoints,self.kpoints):
-                raise Exception('zpr and te files (index {}) do not have the same kpoint array.'.format(ifile))
-            if not np.allclose(te_file.eig0, self.eig0[0,:,:self.max_band]):
-                raise Exception('zpr and te files (index {}) do not have the same bare eigenvalues.'.format(ifile))
+            if not np.allclose(te_file.kpoints,self.kpoints):
+                raise Exception('zpr and te files (index {}) do not have the same kpoint array.\n zpr has {} kpts and te has {}.'.format(ifile, self.kpoints.shape[0],te_file.kpoints.shape[0]))
+            if not self.read_correction_from_spline:
+                if not np.allclose(te_file.eig0, zpr_eig0[0,:,:self.max_band]):
+                    raise Exception('zpr and te files (index {}) do not have the same bare eigenvalues.'.format(ifile))
 
 
            ############################################### 
@@ -5579,6 +5652,20 @@ class ZPR_plotter(object):
                     else:
                         raise Exception('What kind of energy units are you using?!?')
 
+            print('TE :', te_file.indirect_gap_ren)#, te_file.indirect_gap_ren[5])
+#            print('sum:', te_file.indirect_gap_ren[0]+zpr_file.indirect_gap_ren[0])
+            if self.bare_fnames is not None:
+                print('Defining bare eigenvalues from bare_fnames')
+                self.eig0 = bare_file.eig0
+                if self.units == 'eV':
+                    self.eig0 = self.eig0*cst.ha_to_ev
+                elif self.units == 'meV':
+                    self.eig0 = self.eig0*cst.ha_to_ev*1E3
+            elif self.read_correction_from_spline:
+                self.eig0 = te_file.eig0
+            else:
+                self.eig0 = zpr_file.eig0
+
             # Set side of phase transition for split2 option
             if self.split2:
                 if self.pressure[ifile] < self.crit_pressure:
@@ -5590,16 +5677,18 @@ class ZPR_plotter(object):
             self.correction = np.zeros((self.nsppol,self.nkpt, self.max_band, self.ntemp))
             self.eigcorr = np.zeros((self.nsppol,self.nkpt, self.max_band, self.ntemp))
 
-            print(te_file.correction[0,:,27,-1])
-            print(zpr_file.correction[0,:,27,-1])
+#            print(te_file.correction[0,:,27,-1])
             for t in range(self.ntemp):
                 if self.max_band is not None:
-                    self.correction[:,:,:,t] = te_file.correction[:,:,:,t] + zpr_file.correction[:,:,:self.max_band,t]
+                    self.correction[:,:,:,t] = te_file.correction[:,:,:,t] + zpr_correction[:,:,:self.max_band,t]
                     self.eigcorr[:,:,:,t] = self.eig0[:,:,:self.max_band] + self.correction[:,:,:,t]
                 else:
-                    self.correction = te_file.correction + zpr_file.correction
+                    self.correction = te_file.correction + zpr_correction
                     self.eigcorr = self.eig0 + self.correction
-            print(self.correction[0,:,27,-1])
+#            print(self.correction[0,:,27,-1])
+            ###here###
+            
+        #    print(te_file.correction[0,440:480,28,0])
             
             # Initialize plotting arrays
             if ifile==0:
@@ -5656,7 +5745,114 @@ class ZPR_plotter(object):
                 p_index = self.find_pressure_index(self.pressure[ifile])
                 self.full_energy0[ifile] = self.explicit_gap_energies[p_index]
 
+            # Plotting for test purposes
+            if ifile == 8:
+                tarr = [0,1,2,3,4,5]
+                #typ='eig'
+                kptarr = range(len(self.kpoints))
+#                figt, arrt = plt.subplots(2,5)
+#                arrt.plot(kptarr,self.eig0[0,:,27:29],'k')
+                
+                for ti in tarr:
+                    #if typ == 'corr':
+                    arrt[3,ti].plot(kptarr,zpr_correction[0,:,27,ti],'b',label='EPI')
+                    arrt[3,ti].plot(kptarr,te_file.correction[0,:,27,ti], 'r', label='TE')
+                    arrt[3,ti].plot(kptarr,self.correction[0,:,27,ti], 'g', label='EPI+TE')
 
+                    arrt[1,ti].plot(kptarr,zpr_correction[0,:,28,ti],'b',label='EPI')
+                    arrt[1,ti].plot(kptarr,te_file.correction[0,:,28,ti], 'r', label='TE')
+                    arrt[1,ti].plot(kptarr,self.correction[0,:,28,ti], 'g', label='EPI+TE')
+                    
+                    # total gap correction
+                    arrt[4,ti].plot(kptarr,zpr_correction[0,:,28,ti]-zpr_correction[0,:,27,ti],'b',label='EPI')
+                    arrt[4,ti].plot(kptarr,te_file.correction[0,:,28,ti]-te_file.correction[0,:,27,ti], 'r', label='TE')
+                    arrt[4,ti].plot(kptarr,self.correction[0,:,28,ti]-self.correction[0,:,27,ti], 'g', label='EPI+TE')
+
+                    #elif typ == 'eig':
+                    arrt[2,ti].plot(kptarr, self.eig0[0,:,27],'k', label='bare')
+                    arrt[2,ti].plot(kptarr,self.eig0[0,:,27]+zpr_correction[0,:,27,ti],'b',label='EPI')
+                    arrt[2,ti].plot(kptarr,self.eig0[0,:,27]+te_file.correction[0,:,27,ti], 'r', label='TE')
+                    arrt[2,ti].plot(kptarr,self.eigcorr[0,:,27,ti], 'g', label='EPI+TE')
+
+                    arrt[0,ti].plot(kptarr, self.eig0[0,:,28],'k', label='bare')
+                    arrt[0,ti].plot(kptarr,self.eig0[0,:,28]+zpr_correction[0,:,28,ti],'b',label='EPI')
+                    arrt[0,ti].plot(kptarr,self.eig0[0,:,28]+te_file.correction[0,:,28,ti], 'r', label='TE')
+                    arrt[0,ti].plot(kptarr,self.eigcorr[0,:,28,ti], 'g', label='EPI+TE')
+
+
+                    
+                    v1 = self.find_gap_index(zpr_file.indirect_gap_location[ti,0,:])
+                    c1 = self.find_gap_index(zpr_file.indirect_gap_location[ti,1,:])
+                    v2 = self.find_gap_index(te_file.indirect_gap_location[ti,0,:])
+                    c2 = self.find_gap_index(te_file.indirect_gap_location[ti,1,:])
+                    v3 = int(self.full_gap_loc[ifile,ti+1,0] )
+                    c3 = int(self.full_gap_loc[ifile,ti+1,1])
+
+                    bare_vbm = np.argmax(self.eig0[0,:,27])
+                    bare_cbm = np.argmin(self.eig0[0,:,28])
+
+                    #if typ == 'corr':
+                    arrt[3,ti].plot(v1,zpr_correction[0,v1,27,ti], 'bx')
+                    arrt[3,ti].plot(v2,te_file.correction[0,v2,27,ti], 'rx')
+                    arrt[3,ti].plot(v3,self.correction[0,v3,27,ti], 'gx')
+                    arrt[1,ti].plot(c1,zpr_correction[0,c1,28,ti], 'bx')
+                    arrt[1,ti].plot(c2,te_file.correction[0,c2,28,ti], 'rx')
+                    arrt[1,ti].plot(c3,self.correction[0,c3,28,ti], 'gx')
+                    #elif typ == 'eig': 
+                    arrt[2,ti].plot(v1,self.eig0[0,v1,27]+zpr_correction[0,v1,27,ti], 'bx')
+                    arrt[2,ti].plot(v2,self.eig0[0,v2,27]+te_file.correction[0,v2,27,ti], 'rx')
+                    arrt[2,ti].plot(v3,self.eigcorr[0,v3,27,ti], 'gx')
+                    arrt[0,ti].plot(c1,self.eig0[0,c1,28]+zpr_correction[0,c1,28,ti], 'bx')
+                    arrt[0,ti].plot(c2,self.eig0[0,c2,28]+te_file.correction[0,c2,28,ti], 'rx')
+                    arrt[0,ti].plot(c3,self.eigcorr[0,c3,28,ti], 'gx')
+                    #arrt[1,ti].plot(bare_vbm*np.ones((10)), np.linspace(arrt[1,ti].get_ylim()[0], arrt[1,ti].get_ylim()[1], 10), 'k:')
+                    #arrt[0,ti].plot(bare_cbm*np.ones((10)), np.linspace(arrt[0,ti].get_ylim()[0], arrt[0,ti].get_ylim()[1], 10), 'k:')
+
+
+
+#                    arrt[0,ti].set_xlim(100,200)
+#                    arrt[1,ti].set_xlim(100,200)
+                    arrt[0,ti].set_xlim(0,260)
+                    arrt[2,ti].set_xlim(0,260)
+                    arrt[1,ti].set_xlim(0,260)
+                    arrt[3,ti].set_xlim(0,260)
+                    arrt[4,ti].set_xlim(0,260)
+
+
+                    arrt[0,ti].set_ylim(1100,2000)
+                    arrt[2,ti].set_ylim(1000,1500)
+                    arrt[2,ti].plot(bare_vbm*np.ones((10)), np.linspace(arrt[2,ti].get_ylim()[0], arrt[2,ti].get_ylim()[1], 10), 'k:')
+                    arrt[0,ti].plot(bare_cbm*np.ones((10)), np.linspace(arrt[0,ti].get_ylim()[0], arrt[0,ti].get_ylim()[1], 10), 'k:')
+                    arrt[3,ti].plot(bare_vbm*np.ones((10)), np.linspace(arrt[3,ti].get_ylim()[0], arrt[3,ti].get_ylim()[1], 10), 'k:')
+                    arrt[1,ti].plot(bare_cbm*np.ones((10)), np.linspace(arrt[1,ti].get_ylim()[0], arrt[1,ti].get_ylim()[1], 10), 'k:')
+                    arrt[2,ti].plot(v3*np.ones((10)), np.linspace(arrt[2,ti].get_ylim()[0], arrt[2,ti].get_ylim()[1], 10), 'g:')
+                    arrt[0,ti].plot(c3*np.ones((10)), np.linspace(arrt[0,ti].get_ylim()[0], arrt[0,ti].get_ylim()[1], 10), 'g:')
+                    arrt[3,ti].plot(v3*np.ones((10)), np.linspace(arrt[3,ti].get_ylim()[0], arrt[3,ti].get_ylim()[1], 10), 'g:')
+                    arrt[1,ti].plot(c3*np.ones((10)), np.linspace(arrt[1,ti].get_ylim()[0], arrt[1,ti].get_ylim()[1], 10), 'g:')
+                    arrt[4,ti].plot(c3*np.ones((10)), np.linspace(arrt[4,ti].get_ylim()[0], arrt[4,ti].get_ylim()[1], 10), ':', color='purple')
+                    arrt[4,ti].plot(v3*np.ones((10)), np.linspace(arrt[4,ti].get_ylim()[0], arrt[4,ti].get_ylim()[1], 10), ':', color='pink')
+
+
+
+
+                    for a1,a2 in itt.product(range(5),range(6)):
+                        arrt[a1,a2].plot(np.linspace(0,260,10), np.zeros((10)), 'k')
+
+    #                arrt.set_ylim(1400,1600)
+                    arrt[0,ti].set_title('{} K'.format(self.temp[ti]))
+                    
+                figt.suptitle('{}GPa'.format(self.pressure[ifile]))
+                arrt[0,0].set_ylabel('CBM eigcorr')
+                arrt[2,0].set_ylabel('VBM eigcorr')
+                arrt[1,0].set_ylabel('CBM corr')
+                arrt[3,0].set_ylabel('VBM corr')
+                arrt[4,0].set_ylabel('Gap corr')
+                #if typ == 'corr':
+                #    plt.savefig('totalcorr_0p5gpa_{}K.png'.format(self.temp[ti]))
+                #    os.system('open totalcorr_0p5gpa_{}K.png'.format(self.temp[ti]))
+                #elif typ == 'eig':
+                plt.savefig('shift2d_1gpa.png'.format(self.temp[ti]))
+                os.system('open shift2d_1gpa.png'.format(self.temp[ti]))
 
 ####### unchanged stuff strts here
 
@@ -5729,14 +5925,34 @@ class ZPR_plotter(object):
                     full_energy[ifile,:] =  self.full_gap_ren[ifile,:] + np.ones(self.ntemp)*self.full_energy0[ifile]
 
 
+#            if ifile == 4:
+#                kptarr = range(len(self.kpoints))
+#                bbands = [27,28]
+#                for j in bbands:
+#                    arrB.plot(kptarr, self.eig0[0,:,j], 'k')
+#                    arrB.plot(kptarr, self.eig0[0,:,j] + zpr_correction[0,:,j,0], 'bx')
+#                    arrB.plot(kptarr, self.eig0[0,:,j] + te_file.correction[0,:,j,0],'rx')
+#                    arrB.plot(kptarr, self.eigcorr[0,:,j,0], 'g')
+#                    #arrB.set_ylim(1925,2080)
+#                    #arrB.set_xlim(440,480)
+#                plt.savefig('test_total.png')
+#                os.system('open test_total.png')
+#        print('conduction')
+#        print(self.full_gap_ren_band[:,:,1])
+#        print('valence')
+#        print(self.full_gap_ren_band[:,:,0])
+#        print('gap')
+#        print(self.full_gap_ren[:,:])
 
-        print(np.shape(self.full_gap_energy))
+#        print(self.kpoints.shape)
+#        print(self.full_gap_loc[4,1,:])
+#        print('Gap location EPI+TE:',self.kpoints[int(self.full_gap_loc[4,1,0]),:], self.kpoints[int(self.full_gap_loc[4,1,1]),:])
+
         self.full_gap_energy = full_energy
-        print(np.shape(self.full_gap_energy))
         if self.crit_pressure is not None:
-            crit_index = self.find_temp_index()
+            crit_index = self.find_crit_pressure(self.crit_pressure, self.pressure)
             if self.gap_fname is not None:
-                crit_index2 = self.find_temp_index2(self.explicit_pressures)
+                crit_index2 = self.find_crit_pressure(self.crit_pressure2, self.explicit_pressures)
                 print('crit_index2',crit_index2)
         else:
             crit_index = None
@@ -5746,6 +5962,14 @@ class ZPR_plotter(object):
             self.full_energy0[-1,:] = -self.full_energy0[-1,:]
             self.full_gap_energy[-1,:,:] = -self.full_gap_energy[-1,:,:]
 
+        print('EPI+TE :')
+        print(self.full_gap_ren[:,0])
+        print('for 1.0GPa')
+        print(self.full_gap_ren[2,:])
+
+        print('for 1.5GPa')
+        print(self.full_gap_ren[3,:])
+#        print(self.full_gap_ren[:,5])
     # Extrapolate behavior linearly towards TPT... it IS a bit sketchy.
         pressure1 = np.arange(1.5,2.0,0.1)
         tmparr = np.arange(2.1,2.6,0.1) # change 2.2 to 2.6 foir full BZ
@@ -5760,12 +5984,14 @@ class ZPR_plotter(object):
 
         y0,y1 = np.polyfit(self.explicit_pressures[21:29], self.explicit_gap_energies[21:29],1)
         tmp22 = y1 + tmparr2*y0
-        self.extr_pressure2 = np.concatenate((pressure2,tmparr2))
+        self.extr_pressure2 = np.concatenate((tmparr2,pressure2))
 
         self.extr_full_gap_ren1 = np.zeros((len(self.extr_pressure1), self.ntemp))
         self.extr_full_gap_ren2 = np.zeros((len(self.extr_pressure2), self.ntemp))
         self.extr_full_gap_energy1 = np.zeros((len(self.extr_pressure1), self.ntemp))
         self.extr_full_gap_energy2 = np.zeros((len(self.extr_pressure2), self.ntemp))
+        self.extr_full_band_ren1 = np.zeros((len(self.extr_pressure1), self.ntemp,2)) #pressure, temperature, val/cond
+        self.extr_full_band_ren2 = np.zeros((len(self.extr_pressure2), self.ntemp,2))    
         extr_energy01 = np.zeros((len(pressure1)))
         extr_energy02 = np.zeros((len(pressure2)))
 #        self.extr_full_energy02 = np.zeros((len(self.extr_pressure2)))
@@ -5781,7 +6007,7 @@ class ZPR_plotter(object):
             ind = self.find_pressure_index(pres)
             extr_energy02[p] = self.explicit_gap_energies[ind]
 
-        self.extr_full_energy02 = np.concatenate((extr_energy02,tmp22))
+        self.extr_full_energy02 = np.concatenate((tmp22,extr_energy02))
 
         #Store extrapolated phase boundaries (T)
         self.pc1 = np.zeros((self.ntemp))
@@ -5790,44 +6016,75 @@ class ZPR_plotter(object):
         for T in range(self.ntemp):
 
             if self.split:
-                #trivial side
-                x0,x1 = np.polyfit(self.pressure[0:crit_index+1], self.full_gap_ren[0:crit_index+1,T,0], 1)
-                self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
-                self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
+                if extrapolate_bands:
+                    raise Exception('Extrapolate_bands not implemented for split yet')
+                else:
+                    #trivial side
+                    x0,x1 = np.polyfit(self.pressure[0:crit_index+1], self.full_gap_ren[0:crit_index+1,T,0], 1)
+                    self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
+                    self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
 
-                # topol side
-                x0,x1 =  np.polyfit(self.pressure[crit_index+1:], self.full_gap_ren[crit_index+1:,T,0], 1)
-                self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
-                self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
+                    # topol side
+                    x0,x1 =  np.polyfit(self.pressure[crit_index+1:], self.full_gap_ren[crit_index+1:,T,0], 1)
+                    self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
+                    self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
 
             elif self.split2:
-                #trivial side
-                x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_gap_ren[crit_index-1:crit_index+1,T], 1)
-                self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
-                self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
+                if extrapolate_bands:
+                    raise Exception('Extrapolate_bands not implemented for split yet')
+                else:
+                    #trivial side
+                    x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_gap_ren[crit_index-1:crit_index+1,T], 1)
+                    self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
+                    self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
 
-                # topol side
-                x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_gap_ren[crit_index+1:crit_index+3,T], 1)
-                self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
-                self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
+                    # topol side
+                    x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_gap_ren[crit_index+1:crit_index+3,T], 1)
+                    self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
+                    self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
 
 
             else:
-                #trivial side
-                x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_gap_ren[crit_index-1:crit_index+1,T], 1)
-                print('For T={} K:'.format(self.temp[T]))
-                self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
-                self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
-                x0,x1 = np.polyfit(self.extr_pressure1,self.extr_full_gap_energy1[:,T],1)
-                print('trivial side : {} GPa'.format(-x1/x0))
-                self.pc1[T] = -x1/x0
-                # topol side
-                x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_gap_ren[crit_index+1:crit_index+3,T], 1)
-                self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
-                self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
-                x0,x1 = np.polyfit(self.extr_pressure2,self.extr_full_gap_energy2[:,T],1)
-                print('topol side : {} GPa'.format(-x1/x0))
-                self.pc2[T] = -x1/x0
+                if extrapolate_bands:
+                    # Loop on band extrema:
+                    print('\n\nFor T={} K:'.format(self.temp[T]))
+
+                    for b in range(2):
+                        #trivial side
+                        x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_gap_ren_band[crit_index-1:crit_index+1,T,b], 1)
+                        self.extr_full_band_ren1[:,T,b] = x1 + x0*self.extr_pressure1
+
+                        # topol side
+                        x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_gap_ren_band[crit_index+1:crit_index+3,T,b], 1)
+                        self.extr_full_band_ren2[:,T,b] = x1 + x0*self.extr_pressure2
+
+                    self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_band_ren1[:,T,1] - self.extr_full_band_ren1[:,T,0]
+                    self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_band_ren2[:,T,1] - self.extr_full_band_ren2[:,T,0]
+
+                    x0,x1 = np.polyfit(self.extr_pressure1,self.extr_full_gap_energy1[:,T],1)
+                    print('trivial side : {} GPa'.format(-x1/x0))
+                    self.pc1[T] = -x1/x0
+
+                    x0,x1 = np.polyfit(self.extr_pressure2,self.extr_full_gap_energy2[:,T],1)
+                    print('topol side : {} GPa'.format(-x1/x0))
+                    self.pc2[T] = -x1/x0
+
+                else:
+                    #trivial side
+                    x0,x1 = np.polyfit(self.pressure[crit_index-1:crit_index+1], self.full_gap_ren[crit_index-1:crit_index+1,T], 1)
+                    print('For T={} K:'.format(self.temp[T]))
+                    self.extr_full_gap_ren1[:,T] = x1 + x0*self.extr_pressure1
+                    self.extr_full_gap_energy1[:,T] = self.extr_full_energy01 + self.extr_full_gap_ren1[:,T]
+                    x0,x1 = np.polyfit(self.extr_pressure1,self.extr_full_gap_energy1[:,T],1)
+                    print('trivial side : {} GPa'.format(-x1/x0))
+                    self.pc1[T] = -x1/x0
+                    # topol side
+                    x0,x1 =  np.polyfit(self.pressure[crit_index+1:crit_index+3], self.full_gap_ren[crit_index+1:crit_index+3,T], 1)
+                    self.extr_full_gap_ren2[:,T] = x1 + x0*self.extr_pressure2
+                    self.extr_full_gap_energy2[:,T] = self.extr_full_energy02 + self.extr_full_gap_ren2[:,T]
+                    x0,x1 = np.polyfit(self.extr_pressure2,self.extr_full_gap_energy2[:,T],1)
+                    print('topol side : {} GPa'.format(-x1/x0))
+                    self.pc2[T] = -x1/x0
 
 #        print(self.extr_pressure1)
 #        print(self.extr_full_gap_energy1)
@@ -6746,10 +7003,10 @@ class ZPR_plotter(object):
         with open(outfile,'w') as f:
 
             f.write('Topological phase transition boundaries\n\n')
-            f.write('{:>15}  {:>9}  {:>9}  {:>11}\n'.format('Temperature (K)','Pc1 (GPa)','Pc2 (GPa)','width (GPa)'))
-            f.write('{:>15}  {:>9.5f}  {:>9.5f}  {:>11.5f}\n'.format('Static',self.crit_pressure,self.crit_pressure2,self.crit_pressure2-self.crit_pressure))
+            f.write('{:>15}  {:>9}  {:>9}  {:>11}  {:>11}\n'.format('Temperature (K)','Pc1 (GPa)','Pc2 (GPa)','width (GPa)','width vs T=0(%)'))
+            f.write('{:>15}  {:>9.5f}  {:>9.5f}  {:>11.5f}  {:>11.5f}\n'.format('Static',self.crit_pressure,self.crit_pressure2,self.crit_pressure2-self.crit_pressure,1.0))
             for t, T in enumerate(self.ref_temp):
-                f.write('{:>15.2f}  {:>9.5f}  {:>9.5f}  {:>11.5f}\n'.format(T,self.pc1[t],self.pc2[t],self.pc2[t]-self.pc1[t]))
+                f.write('{:>15.2f}  {:>9.5f}  {:>9.5f}  {:>11.5f}  {:>11.5f}\n'.format(T,self.pc1[t],self.pc2[t],self.pc2[t]-self.pc1[t], (self.pc2[t]-self.pc1[t])/(self.crit_pressure2-self.crit_pressure)))
 
         f.close()
         return
@@ -7022,6 +7279,7 @@ class ZPR_plotter(object):
         # Finds the location of the unperturbed and perturbed direct gap + computes the gap energy
         val = self.valence - 1
         cond = val + 1
+        print(val, cond)
 
         if self.spline:
             # Interpolate kpoints
@@ -7442,6 +7700,9 @@ class ZPR_plotter(object):
         if self.savefile:
             g.savefig('figures/'+self.savefile+'.png')
             os.system('open figures/{}.png'.format(self.savefile))
+            #g.savefig('figures/{}.eps'.format(self.savefile), format='eps',dpi=1200)
+            #os.system('open figures/{}.eps'.format(self.savefile))
+
         else:
             plt.show()
     
@@ -7497,6 +7758,7 @@ def plotter(
         zpr_fnames = list(),
         gap_fname = None,
         te_fnames = None,
+        bare_fnames = None,
         rootname = 'zpr.png',
 
         # Parameters
@@ -7574,6 +7836,7 @@ def plotter(
         spline = False,
         spline_factor = 5,
         extrapolate_ren = False,
+        read_correction_from_spline = False,
 
         **kwargs):
 
@@ -7582,6 +7845,7 @@ def plotter(
             rootname = rootname,
             gap_fname = gap_fname,
             te_fnames = te_fnames,
+            bare_fnames = bare_fnames,
 
             nsppol = nsppol,
             nkpt = nkpt,
@@ -7660,6 +7924,7 @@ def plotter(
             spline = spline,
             spline_factor = spline_factor,
             extrapolate_ren = extrapolate_ren,
+            read_correction_from_spline = read_correction_from_spline,
 
             **kwargs)
             
