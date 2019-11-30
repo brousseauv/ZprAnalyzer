@@ -6952,14 +6952,45 @@ class ZPR_plotter(object):
     def plot_phase_diagram(self):
 
         from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+
+        fill = False
+        crossover = True
         # Plot (P,T) phase diagram, from output of plot_pgap_indirect
         _fig, _arr = plt.subplots(1,1,figsize=self.figsize,squeeze=True)
 
         _arr.plot(self.pc1,self.ref_temp,marker='o',markersize=6,color='k')
         _arr.plot(self.pc2,self.ref_temp,marker='o',markersize=6,color='k')
-        _arr.fill_betweenx(self.ref_temp,self.pc1,self.pc2,color='gray',alpha=0.2)
-#        _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#363256',alpha=0.6) #darkbluepurple
-        _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#6C70C8',alpha=0.6) #periwinkle
+        if fill:
+            _arr.fill_betweenx(self.ref_temp,self.pc1,self.pc2,color='gray',alpha=0.2)
+    #        _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#363256',alpha=0.6) #darkbluepurple
+            _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#6C70C8',alpha=0.6) #periwinkle
+
+        if crossover:
+
+            # Read delta_pc from file
+            self.deltap_fname = '/Users/Veronique/Google_Drive/doctorat/work/TI/BiTeI/NC/phonons/0gpa/11-TE/delta_p_from_kbt.nc'
+            with nc.Dataset(self.deltap_fname,'r') as ncdata:
+                delta_pc1 = ncdata.variables['delta_p_trivial_phase'][:]
+                delta_pc2 = ncdata.variables['delta_p_topological_phase'][:]
+
+            self.delta_pc1 = self.pc1-delta_pc1
+            self.delta_pc2 = self.pc2+delta_pc2
+            #Define meshgrid
+            gridx, gridy = np.meshgrid(np.linspace(self.pressure[0], self.pressure[-1], 51), np.linspace(self.temp[0], self.temp[-1], 51))
+            # pc1 and pc2 are still stored
+            _arr.plot(gridx,gridy, marker='.', color='k', linestyle='none')
+            _arr.plot(self.delta_pc1, self.ref_temp, marker='s',color='k', linestyle = 'dashed')
+            _arr.plot(self.delta_pc2, self.ref_temp, marker='s',color='k', linestyle = 'dashed')
+
+            # define a value for each point in the grid, depending on its location vs the phase boundaries
+            self.phase = self.get_phase_grid(gridx,gridy,_arr)
+
+            print(self.pressure[-1]/self.temp[-1])
+            _arr.matshow(self.phase, extent = [self.pressure[0],self.pressure[-1], self.temp[0], self.temp[-1]], origin='lower', 
+                    aspect = 0.65*self.pressure[-1]/self.temp[-1],interpolation='spline16', vmin=0, vmax=2)            
+
+
+
         x = np.ones((len(self.ref_temp)))
         _arr.plot(self.crit_pressure*x, self.ref_temp,'k:')
         _arr.plot(self.crit_pressure2*x, self.ref_temp,'k:')
@@ -6993,6 +7024,87 @@ class ZPR_plotter(object):
         self.save_phase_diagram(_fig)
 
         self.write_phase_diagram()
+
+    def get_phase_grid(self, x,y ,f):
+
+        dim = x.shape[0]
+        res = np.zeros((x.shape[0], y.shape[1]))
+        print(res.shape)
+        # Define interpolated lines of pc1-delta_pc1, pc1, pc2, pc2+delta_pc2 as P(T) with interp1D
+        # Store lines in a long array of lenght 51 for each boundary
+        bound1 = np.zeros((dim))
+        bound2 = np.zeros((dim))
+        bound3 = np.zeros((dim))
+        bound4 = np.zeros((dim))
+
+        for i in range(dim):
+            t = y[i,i]
+            loc = self.locate_temp_index(t)
+
+            if loc<len(self.temp)-1:
+                line = interp1d(self.temp[loc:loc+2],self.delta_pc1[loc:loc+2], kind='slinear')
+                bound1[i] = line(t)
+
+                line = interp1d(self.temp[loc:loc+2],self.pc1[loc:loc+2], kind='slinear')
+                bound2[i] = line(t)
+
+                line = interp1d(self.temp[loc:loc+2],self.pc2[loc:loc+2], kind='slinear')
+                bound3[i] = line(t)
+
+                line = interp1d(self.temp[loc:loc+2],self.delta_pc2[loc:loc+2], kind='slinear')
+                bound4[i] = line(t)
+
+            else:
+                bound1[i] = self.delta_pc1[-1]
+                bound2[i] = self.pc1[-1]
+                bound3[i] = self.pc2[-1]
+                bound4[i] = self.delta_pc2[-1]
+
+        f.plot(bound1, y[:,0], 'r:',linewidth=2)
+        f.plot(bound2, y[:,0], 'b:',linewidth=2)
+        f.plot(bound3, y[:,0], 'c:',linewidth=2)
+        f.plot(bound4, y[:,0], 'm:',linewidth=2)
+
+        for i,j in itt.product(range(51),range(51)):
+            '''ligne horizontale'''
+#            f.plot(x[i,j], y[0,0], 'ob') 
+            ''' ligne verticale'''
+#            f.plot(x[11,11],y[i,j], 'or')
+            '''point individuel'''
+#            f.plot(x[20,20], y[40,40],'og')
+
+            #Define individual point
+            point = [x[i,j],y[i,j]]
+#            print(i,j,point[0], point[1])
+
+            #For a given Temp value point[1], check where is P value point[0] is located, using boundary arrays
+            if point[0] <= bound1[i]:
+                # If trivial, assign value = -1
+                res[i,j] = 0 
+
+            if point[0] >= bound2[i] and point[0] <= bound3[i]:
+                # If WSM (between pc1 and pc2) assign 0
+                res[i,j] = 1
+
+            if point[0] >= bound4[i]: 
+                # If topological, assign 1
+                res[i,j] = 2
+
+            # If within uncertaintoes from kbT, define value from linear interpolation between boundaries at T on the P axis
+            if point[0] > bound1[i] and point[0] < bound2[i]:
+                res[i,j] = (point[0]-bound1[i])/(bound2[i]-bound1[i])
+
+            if point[0] > bound3[i] and point[0] < bound4[i]:
+                res[i,j] = 1 + (point[0]-bound3[i])/(bound4[i]-bound3[i])
+
+
+
+        #self.phase a une shape de (2,51,51), comme meshgrid)
+
+#            if self.phase[:,i,j] == -1:
+#                f.plot(x[i,j], y[i,j],'ro')
+#            if self.phase[:,
+        return res
 
     def write_phase_diagram(self):
 
@@ -7141,6 +7253,18 @@ class ZPR_plotter(object):
                 return lst.index(self.tmax)
             else:
                 return None
+
+    def locate_temp_index(self, t):
+        lst = list(self.temp)
+
+        if t in lst:
+            return lst.index(t)
+        else:
+            for i in range(len(self.temp)-1):
+                if self.temp[i] < t and t < self.temp[i+1]:
+                    return i
+            print('{} not found in temperature array'.format(t))
+            return None
 
     def find_crit_pressure(self, crit_pressure, pressure):
         if self.pgap or self.te_pgap or self.total_pgap:
