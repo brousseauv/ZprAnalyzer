@@ -7,6 +7,9 @@ from matplotlib.ticker import AutoMinorLocator
 from matplotlib.ticker import FuncFormatter
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
+from matplotlib import cm
+import matplotlib.colors as mcolors
+
 import netCDF4 as nc
 import numpy as np
 import os
@@ -354,6 +357,7 @@ class ZPR_plotter(object):
     te_fnames = None
     bare_fnames = None
     gap_fname = None
+    deltap_fname = None
         
     # Parameters
     nsppol = None
@@ -418,6 +422,7 @@ class ZPR_plotter(object):
     title = None
     savefile = None
     degen = None
+    cmap_cols = None
 
     renormalization = True
     spectral = False
@@ -445,6 +450,8 @@ class ZPR_plotter(object):
     zero_gap_units = 'eV'
     extrapolate_ren = False
     read_correction_from_spline = False
+    crossover = False
+    diagram_together = False
 
     def __init__(self,
 
@@ -468,6 +475,7 @@ class ZPR_plotter(object):
             xticks = None,
             xticks_labels = None,
             xticks_alignment = None,
+            cmap_cols = None,
             bands_to_print = None,
             band_numbers = None,
             point_for_se = None,
@@ -538,6 +546,8 @@ class ZPR_plotter(object):
             explicit_pressures = None,
             experimental_data = None,
             expdata = None,
+            crossover = False,
+            diagram_together = False,
 
             units = 'eV',
             gap_units = None,
@@ -548,6 +558,7 @@ class ZPR_plotter(object):
             te_fnames = None,
             gap_fname = None,
             bare_fnames = None,
+            deltap_fname = None,
             
             **kwargs):
 
@@ -556,6 +567,7 @@ class ZPR_plotter(object):
         self.gap_fname = gap_fname
         self.te_fnames = te_fnames
         self.bare_fnames = bare_fnames
+        self.deltap_fname = deltap_fname
 
 
         # Define options
@@ -578,6 +590,7 @@ class ZPR_plotter(object):
         self.xticks = xticks
         self.xticks_labels = xticks_labels
         self.xticks_alignment = xticks_alignment
+        self.cmap_cols = cmap_cols
         self.bands_to_print = bands_to_print
         self.band_numbers = band_numbers
         self.point_for_se = point_for_se
@@ -599,6 +612,8 @@ class ZPR_plotter(object):
         self.spline_factor = spline_factor
         self.extrapolate_ren = extrapolate_ren
         self.read_correction_from_spline = read_correction_from_spline
+        self.crossover = crossover
+        self.diagram_together = diagram_together
 
         self.verbose = verbose
         self.zero_gap_value = zero_gap_value 
@@ -624,6 +639,7 @@ class ZPR_plotter(object):
         self.split_contribution = split_contribution
         self.split_occupied_subspace = split_occupied_subspace
         self.modes = modes
+        print(self.crossover)
 
         # Check if input is correct 
         self.check_input()
@@ -5513,7 +5529,10 @@ class ZPR_plotter(object):
         extrapolate_bands = True
 
         if only:
-            fig, _arr = plt.subplots(1,1, figsize=self.figsize, squeeze=False, sharex=True)
+            if self.diagram_together:
+                fig, _arr = plt.subplots(1,2, figsize=(self.figsize[0]*2, self.figsize[1]), squeeze=False, sharex=True)
+            else:
+                fig, _arr = plt.subplots(1,1, figsize=self.figsize, squeeze=False, sharex=True)
         else:
             fig, _arr = plt.subplots(2,1, figsize=self.figsize, squeeze=False, sharex=True)
         #plt.subplots_adjust(hspace=0.05, top=0.95) 
@@ -5566,7 +5585,7 @@ class ZPR_plotter(object):
         # Read and treat all input files
         for ifile in range(file_qty):
                 
-            print('file #',ifile+1)
+            #print('file #',ifile+1)
             # Define file class
             zpr_file = ZPRfile(self.zpr_fnames[ifile], read=False)
             zpr_file.read_nc()
@@ -5598,7 +5617,7 @@ class ZPR_plotter(object):
                 zpr_eig0 = te_file.eig0*cst.ha_to_ev*1000
                 zpr_correction = zpr_correction*cst.ha_to_ev*1E3
 
-            print('EPI: ', zpr_file.indirect_gap_ren)
+            #print('EPI: ', zpr_file.indirect_gap_ren)
             #if ifile==4:
             #    print('Gap location, EPI:',zpr_file.indirect_gap_location[0,:,:])
             #    print('Gap location, TE:',te_file.indirect_gap_location[0,:,:])
@@ -5652,10 +5671,10 @@ class ZPR_plotter(object):
                     else:
                         raise Exception('What kind of energy units are you using?!?')
 
-            print('TE :', te_file.indirect_gap_ren)#, te_file.indirect_gap_ren[5])
+            #print('TE :', te_file.indirect_gap_ren)#, te_file.indirect_gap_ren[5])
 #            print('sum:', te_file.indirect_gap_ren[0]+zpr_file.indirect_gap_ren[0])
             if self.bare_fnames is not None:
-                print('Defining bare eigenvalues from bare_fnames')
+                #print('Defining bare eigenvalues from bare_fnames')
                 self.eig0 = bare_file.eig0
                 if self.units == 'eV':
                     self.eig0 = self.eig0*cst.ha_to_ev
@@ -5962,14 +5981,9 @@ class ZPR_plotter(object):
             self.full_energy0[-1,:] = -self.full_energy0[-1,:]
             self.full_gap_energy[-1,:,:] = -self.full_gap_energy[-1,:,:]
 
-        print('EPI+TE :')
-        print(self.full_gap_ren[:,0])
-        print('for 1.0GPa')
-        print(self.full_gap_ren[2,:])
+        #print('EPI+TE :')
+        #print(self.full_gap_ren[:,0])
 
-        print('for 1.5GPa')
-        print(self.full_gap_ren[3,:])
-#        print(self.full_gap_ren[:,5])
     # Extrapolate behavior linearly towards TPT... it IS a bit sketchy.
         pressure1 = np.arange(1.5,2.0,0.1)
         tmparr = np.arange(2.1,2.6,0.1) # change 2.2 to 2.6 foir full BZ
@@ -6517,7 +6531,12 @@ class ZPR_plotter(object):
             self.save_figure_split(fig,fig2)
         else:
             fig.align_ylabels()
-            self.save_figure(fig)
+            if self.diagram_together:
+                _arr[0,0].text(-0.5,460*350/500, r'a)',fontsize=28)
+                self.fig = fig
+                self.arr = _arr[0,1]
+            else:
+                self.save_figure(fig)
 
 
 
@@ -6953,22 +6972,39 @@ class ZPR_plotter(object):
 
         from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
-        fill = False
-        crossover = True
         # Plot (P,T) phase diagram, from output of plot_pgap_indirect
-        _fig, _arr = plt.subplots(1,1,figsize=self.figsize,squeeze=True)
 
-        _arr.plot(self.pc1,self.ref_temp,marker='o',markersize=6,color='k')
-        _arr.plot(self.pc2,self.ref_temp,marker='o',markersize=6,color='k')
-        if fill:
+        if self.diagram_together:
+            _fig = self.fig
+            _arr = self.arr
+        else:
+            _fig, _arr = plt.subplots(1,1,figsize=self.figsize,squeeze=True)
+
+        _arr.plot(self.pc1,self.ref_temp,marker='o',markersize=6,color='k',linewidth=1.5)
+        _arr.plot(self.pc2,self.ref_temp,marker='o',markersize=6,color='k',linewidth=1.5)
+        if not self.crossover:
             _arr.fill_betweenx(self.ref_temp,self.pc1,self.pc2,color='gray',alpha=0.2)
     #        _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#363256',alpha=0.6) #darkbluepurple
             _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#6C70C8',alpha=0.6) #periwinkle
 
-        if crossover:
 
+            legend_handles = [Line2D([0],[0],color='k',linewidth=1,linestyle='dotted',label=r'Static')]
+            legend1 = _arr.legend(handles=legend_handles, loc=3,fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1)
+            _arr.add_artist(legend1)
+
+            _arr.text(0.8,400,r'$\mathbb{Z}_2=0$',fontsize=24)
+            _arr.text(3.7,400,r'$\mathbb{Z}_2=1$',fontsize=24)
+            _arr.text(2.3,400,r'WSM',fontsize=24,color='#5A5A5A')
+
+
+        else:
+
+            dim = 501
             # Read delta_pc from file
-            self.deltap_fname = '/Users/Veronique/Google_Drive/doctorat/work/TI/BiTeI/NC/phonons/0gpa/11-TE/delta_p_from_kbt.nc'
+            if not self.deltap_fname:
+                raise Exception('A file containing delta_p must be provided for crossover PT diagram.')
+
+#            self.deltap_fname = '/Users/Veronique/Google_Drive/doctorat/work/TI/BiTeI/NC/phonons/0gpa/11-TE/delta_p_from_kbt.nc'
             with nc.Dataset(self.deltap_fname,'r') as ncdata:
                 delta_pc1 = ncdata.variables['delta_p_trivial_phase'][:]
                 delta_pc2 = ncdata.variables['delta_p_topological_phase'][:]
@@ -6976,37 +7012,45 @@ class ZPR_plotter(object):
             self.delta_pc1 = self.pc1-delta_pc1
             self.delta_pc2 = self.pc2+delta_pc2
             #Define meshgrid
-            gridx, gridy = np.meshgrid(np.linspace(self.pressure[0], self.pressure[-1], 51), np.linspace(self.temp[0], self.temp[-1], 51))
+            gridx, gridy = np.meshgrid(np.linspace(self.pressure[0], self.pressure[-1], dim), np.linspace(self.temp[0], self.temp[-1], dim))
             # pc1 and pc2 are still stored
-            _arr.plot(gridx,gridy, marker='.', color='k', linestyle='none')
-            _arr.plot(self.delta_pc1, self.ref_temp, marker='s',color='k', linestyle = 'dashed')
-            _arr.plot(self.delta_pc2, self.ref_temp, marker='s',color='k', linestyle = 'dashed')
+            #_arr.plot(gridx,gridy, marker='.', color='k', linestyle='none')
+#            _arr.plot(self.delta_pc1, self.ref_temp, marker='s',color='k', linestyle = 'dashed',linewidth=1.5)
+#            _arr.plot(self.delta_pc2, self.ref_temp, marker='s',color='k', linestyle = 'dashed',linewidth=1.5)
 
             # define a value for each point in the grid, depending on its location vs the phase boundaries
             self.phase = self.get_phase_grid(gridx,gridy,_arr)
 
-            print(self.pressure[-1]/self.temp[-1])
-            _arr.matshow(self.phase, extent = [self.pressure[0],self.pressure[-1], self.temp[0], self.temp[-1]], origin='lower', 
-                    aspect = 0.65*self.pressure[-1]/self.temp[-1],interpolation='spline16', vmin=0, vmax=2)            
+#            cmap = mcolors.LinearSegmentedColormap.from_list("", ["cornsilk","palegreen","mediumorchid"])
+            cmap = mcolors.LinearSegmentedColormap.from_list("", self.cmap_cols)
+
+            _arr.imshow(self.phase, extent = [self.pressure[0],self.pressure[-1], self.temp[0], self.temp[-1]], origin='lower', 
+                    aspect = 0.65*self.pressure[-1]/self.temp[-1],interpolation='bicubic', vmin=0, vmax=2,cmap=cmap)            
+                                                                    # spline16, bilinear, bicubic
+
+            legend_handles = [Line2D([0],[0],color=self.cmap_cols[0],linestyle='None',marker='s',markersize=16, label=r'$\mathbb{Z}_2=0$',markeredgecolor='k'),
+                                Line2D([0],[0],color=self.cmap_cols[1],linestyle='None',marker='s',markersize=16, label=r'WSM',markeredgecolor='k'),
+                                Line2D([0],[0],color=self.cmap_cols[2],linestyle='None',marker='s',markersize=16, label=r'$\mathbb{Z}_2=1$',markeredgecolor='k'),
+                                Line2D([0],[0],color='k',linestyle='dotted',linewidth=1.5, label=r'Static'),
+                                Line2D([0],[0],color='k', linestyle='solid',linewidth=1.5, label=r'P$_{\text{C}1}$,P$_{\text{C2}}$'),
+#                                Line2D([0],[0],color='k', linestyle='dashed',linewidth=1.5,label=r'$\Delta$P')]
+]
+
+            legend2 = _arr.legend(handles = legend_handles, loc=9, bbox_to_anchor = (0.5,1.15), ncol = len(legend_handles),
+                            fontsize=20,handletextpad=0.4,frameon=True,handlelength=1.4,columnspacing=1.5)
+            _arr.add_artist(legend2)
 
 
 
         x = np.ones((len(self.ref_temp)))
-        _arr.plot(self.crit_pressure*x, self.ref_temp,'k:')
-        _arr.plot(self.crit_pressure2*x, self.ref_temp,'k:')
-        legend_handles = [Line2D([0],[0],color='k',linewidth=1,linestyle='dotted',label=r'Static')]
-        legend1 = _arr.legend(handles=legend_handles, loc=3,fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1)
-
-
+        _arr.plot(self.crit_pressure*x, self.ref_temp,'k:',linewidth=1.5)
+        _arr.plot(self.crit_pressure2*x, self.ref_temp,'k:',linewidth=1.5)
+        
 
         self.set_xaxis(_arr, self.pressure)
         _arr.set_xlim(self.pressure[0],self.pressure[-1])
         self.set_temp_yaxis(_arr, r'Temperature (K)',self.ref_temp)
 
-
-        _arr.text(0.8,400,r'$\mathbb{Z}_2=0$',fontsize=24)
-        _arr.text(3.7,400,r'$\mathbb{Z}_2=1$',fontsize=24)
-        _arr.text(2.3,400,r'WSM',fontsize=24,color='#5A5A5A')
 
 
         if self.pgap:
@@ -7014,7 +7058,10 @@ class ZPR_plotter(object):
         if self.te_pgap:
             _arr.set_title('TE',fontsize=24)
         if self.total_pgap:
-            _arr.set_title('EPI+TE', fontsize=24)
+            if not self.crossover:
+                _arr.set_title('EPI+TE', fontsize=24)
+        if self.diagram_together:
+            _arr.text(-0.5,460, r'b)',fontsize=28)
 
 #        _inset = inset_axes(_arr, loc=2,width='30%', height='30%',borderpad=3)
 #        _inset.plot(self.ref_temp,self.pc2-self.pc1,'b')
@@ -7029,9 +7076,8 @@ class ZPR_plotter(object):
 
         dim = x.shape[0]
         res = np.zeros((x.shape[0], y.shape[1]))
-        print(res.shape)
         # Define interpolated lines of pc1-delta_pc1, pc1, pc2, pc2+delta_pc2 as P(T) with interp1D
-        # Store lines in a long array of lenght 51 for each boundary
+        # Store lines in a long array of lenght dim for each boundary
         bound1 = np.zeros((dim))
         bound2 = np.zeros((dim))
         bound3 = np.zeros((dim))
@@ -7060,12 +7106,12 @@ class ZPR_plotter(object):
                 bound3[i] = self.pc2[-1]
                 bound4[i] = self.delta_pc2[-1]
 
-        f.plot(bound1, y[:,0], 'r:',linewidth=2)
-        f.plot(bound2, y[:,0], 'b:',linewidth=2)
-        f.plot(bound3, y[:,0], 'c:',linewidth=2)
-        f.plot(bound4, y[:,0], 'm:',linewidth=2)
+#        f.plot(bound1, y[:,0], 'r:',linewidth=2)
+#        f.plot(bound2, y[:,0], 'b:',linewidth=2)
+#        f.plot(bound3, y[:,0], 'c:',linewidth=2)
+#        f.plot(bound4, y[:,0], 'm:',linewidth=2)
 
-        for i,j in itt.product(range(51),range(51)):
+        for i,j in itt.product(range(dim),range(dim)):
             '''ligne horizontale'''
 #            f.plot(x[i,j], y[0,0], 'ob') 
             ''' ligne verticale'''
@@ -7093,13 +7139,17 @@ class ZPR_plotter(object):
             # If within uncertaintoes from kbT, define value from linear interpolation between boundaries at T on the P axis
             if point[0] > bound1[i] and point[0] < bound2[i]:
                 res[i,j] = (point[0]-bound1[i])/(bound2[i]-bound1[i])
+                #res[i,j] = 0.1 + 0.9*((point[0]-bound1[i]))/(bound2[i]-bound1[i])
+
 
             if point[0] > bound3[i] and point[0] < bound4[i]:
                 res[i,j] = 1 + (point[0]-bound3[i])/(bound4[i]-bound3[i])
+#                res[i,j] = 1 + 0.85*(point[0]-bound3[i])/(bound4[i]-bound3[i])
 
 
 
-        #self.phase a une shape de (2,51,51), comme meshgrid)
+
+        #self.phase a une shape de (2,dim,dim), comme meshgrid)
 
 #            if self.phase[:,i,j] == -1:
 #                f.plot(x[i,j], y[i,j],'ro')
@@ -7883,6 +7933,7 @@ def plotter(
         gap_fname = None,
         te_fnames = None,
         bare_fnames = None,
+        deltap_fname = None,
         rootname = 'zpr.png',
 
         # Parameters
@@ -7961,6 +8012,9 @@ def plotter(
         spline_factor = 5,
         extrapolate_ren = False,
         read_correction_from_spline = False,
+        cmap_cols = None,
+        crossover = False,
+        diagram_together = False,
 
         **kwargs):
 
@@ -7970,6 +8024,7 @@ def plotter(
             gap_fname = gap_fname,
             te_fnames = te_fnames,
             bare_fnames = bare_fnames,
+            deltap_fname = deltap_fname,
 
             nsppol = nsppol,
             nkpt = nkpt,
@@ -8009,6 +8064,7 @@ def plotter(
 
             yminorticks = yminorticks,
             figsize = figsize,
+            cmap_cols = cmap_cols,
 
             bands_to_print = bands_to_print,
             band_numbers = band_numbers,
@@ -8049,6 +8105,8 @@ def plotter(
             spline_factor = spline_factor,
             extrapolate_ren = extrapolate_ren,
             read_correction_from_spline = read_correction_from_spline,
+            crossover = crossover,
+            diagram_together = diagram_together,
 
             **kwargs)
             
