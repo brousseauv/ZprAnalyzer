@@ -452,6 +452,7 @@ class ZPR_plotter(object):
     read_correction_from_spline = False
     crossover = False
     diagram_together = False
+    save_format = 'png'
 
     def __init__(self,
 
@@ -552,6 +553,7 @@ class ZPR_plotter(object):
             units = 'eV',
             gap_units = None,
             rootname = 'zpr.png',
+            save_format = 'png',
 
             # Input file
             zpr_fnames = list(),
@@ -639,7 +641,7 @@ class ZPR_plotter(object):
         self.split_contribution = split_contribution
         self.split_occupied_subspace = split_occupied_subspace
         self.modes = modes
-        print(self.crossover)
+        self.save_format = save_format
 
         # Check if input is correct 
         self.check_input()
@@ -3554,13 +3556,15 @@ class ZPR_plotter(object):
         limms = [[-50.,50.],[-2.,50.],[-90.,40.]]
 ##########FIX ME : add default data and if condition
         limms = [self.cond_ylims, self.val_ylims, self.gap_ylims]
+
         for i in range(3):
+            _arr[i,0].set_rasterization_zorder(0)
 #            lims = _arr[i,0].get_ylim() 
             ylims = limms[i]    
             self.set_vrefs(_arr[i][0], self.pressure, 0.,style='dashed')
             self.set_hrefs(ylims, _arr[i][0], self.crit_pressure,'gray')
             self.set_hrefs(ylims, _arr[i][0], self.crit_pressure+0.2,'gray')
-            _arr[i][0].fill([2.08,2.28,2.28,2.08],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+            _arr[i][0].fill([2.08,2.28,2.28,2.08],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2,zorder=-1, rasterized=True)
             _arr[i,0].set_ylim(limms[i])
 
 
@@ -3569,7 +3573,7 @@ class ZPR_plotter(object):
                 self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure,'gray')
                 self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure+0.2,'gray')
                 lims = _arr[i,0].get_ylim() 
-                _arr2[i][0].fill([2.08,2.28,2.28,2.08],[lims[0]-5,lims[0]-5,lims[1]+5,lims[1]+5],'gray',alpha=0.2)
+                _arr2[i][0].fill([2.08,2.28,2.28,2.08],[lims[0]-5,lims[0]-5,lims[1]+5,lims[1]+5],'gray',alpha=0.2,zorder=-1, rasterized=True)
 
 
         
@@ -3613,7 +3617,7 @@ class ZPR_plotter(object):
 
         legend_handles = [] 
         for t, temp in enumerate(self.ref_temp):
-            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
+            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=2.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
 #                Line2D([0],[0],color='b',marker='o',markersize=8,linestyle='None',label=r'P$_{\text{C2}}$ plane')]
         #legend_handles.append('')
         #legend_handles.append('')
@@ -4105,7 +4109,7 @@ class ZPR_plotter(object):
         file_qty = len(self.te_fnames)
 
         '''FIX ME : add extrapolate as an external option'''
-        extrapolate = True
+        extrapolate = False
         # Define figure
         fig, _arr = plt.subplots(3,1, figsize=self.figsize, squeeze=False, sharex=True)
 #        plt.subplots_adjust(hspace=0.05, top=0.95) 
@@ -4334,12 +4338,13 @@ class ZPR_plotter(object):
 ##########FIX ME : add default data and if condition
         limms = [self.cond_ylims, self.val_ylims, self.gap_ylims]
         for i in range(3):
+            _arr[i,0].set_rasterization_zorder(0)
 #            lims = _arr[i,0].get_ylim() 
             ylims = limms[i]    
             self.set_vrefs(_arr[i][0], self.pressure, 0.,style='dashed')
             self.set_hrefs(ylims, _arr[i][0], self.crit_pressure,'gray')
             self.set_hrefs(ylims, _arr[i][0], self.crit_pressure+0.2,'gray')
-            _arr[i][0].fill([2.08,2.28,2.28,2.08],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+            _arr[i][0].fill([2.08,2.28,2.28,2.08],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2,zorder=-1,rasterized=True)
             _arr[i,0].set_ylim(limms[i])
 
 
@@ -4348,7 +4353,7 @@ class ZPR_plotter(object):
                 self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure,'gray')
                 self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure+0.2,'gray')
                 lims = _arr[i,0].get_ylim() 
-                _arr2[i][0].fill([2.08,2.28,2.28,2.08],[lims[0]-5,lims[0]-5,lims[1]+5,lims[1]+5],'gray',alpha=0.2)
+                _arr2[i][0].fill([2.08,2.28,2.28,2.08],[lims[0]-5,lims[0]-5,lims[1]+5,lims[1]+5],'gray',alpha=0.2,zorder=-1,rasterized=True)
 
 
         
@@ -4401,7 +4406,7 @@ class ZPR_plotter(object):
 #
         legend_handles = [] 
         for t, temp in enumerate(self.ref_temp):
-            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
+            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=2.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
 #                Line2D([0],[0],color='b',marker='o',markersize=8,linestyle='None',label=r'P$_{\text{C2}}$ plane')]
         #legend_handles.append('')
         #legend_handles.append('')
@@ -6399,13 +6404,14 @@ class ZPR_plotter(object):
             self.set_vrefs(_arr[0][0], self.pressure, 0.)
 #            if i==0:
             if self.crit_pressure:
+                _arr[0][0].set_rasterization_zorder(0)
                 pc1 = self.crit_pressure
                 self.set_hrefs(ylims, _arr[0][0], pc1,'gray')
 
                 if self.crit_pressure2:
                     pc2 = self.crit_pressure2
                     self.set_hrefs(ylims, _arr[0][0], pc2,'gray')
-                    _arr[0][0].fill([pc1,pc2,pc2,pc1],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+                    _arr[0][0].fill([pc1,pc2,pc2,pc1],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2,zorder=-1, rasterized=True)
                 else:
                     print('No value was given for PC2')
             else:
@@ -6419,6 +6425,7 @@ class ZPR_plotter(object):
         else:
             for i in range(2):
     #            lims = _arr[i,0].get_ylim() 
+                _arr[i][0].set_rasterization_order(0)
     #            ylims = lims
                 ylims = limms[i]    
                 self.set_vrefs(_arr[i][0], self.pressure, 0.)
@@ -6428,11 +6435,11 @@ class ZPR_plotter(object):
 
                 self.set_hrefs(ylims, _arr[i][0], pc1,'black')
                 self.set_hrefs(ylims, _arr[i][0], pc2,'black')
-                _arr[i][0].fill([pc1,pc2,pc2,pc1],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2)
+                _arr[i][0].fill([pc1,pc2,pc2,pc1],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2,zorder=-1, rasterized=True)
     #            else:
                 self.set_hrefs(ylims, _arr[i,0], 2.28,'black')
                 self.set_hrefs(ylims, _arr[i,0], 2.65,'black')
-                _arr[i,0].fill([2.28,2.65,2.65,2.28],[ylims[0],ylims[0],ylims[1],ylims[1]],'orange',alpha=0.2)
+                _arr[i,0].fill([2.28,2.65,2.65,2.28],[ylims[0],ylims[0],ylims[1],ylims[1]],'orange',alpha=0.2,zorder=-1, rasterized=True)
  
 
         if only:
@@ -6505,9 +6512,9 @@ class ZPR_plotter(object):
             _arr[0][0].text(1.50,190,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
 
             legend_handles = []
-            legend_handles.append(Line2D([0],[0],color='k',linewidth=1.5,label=r'0 K Static'))
+            legend_handles.append(Line2D([0],[0],color='k',linewidth=2.5,label=r'0 K Static'))
             for t,T in enumerate(self.ref_temp):
-                legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5,label=r'{:>3.0f} K'.format(T)))
+                legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=2.5,label=r'{:>3.0f} K'.format(T)))
 
             legend1 = _arr[0][0].legend(handles=legend_handles, loc=9, bbox_to_anchor=(0.5,1.15),fontsize=20,handletextpad=0.4,handlelength=1.4,frameon=True,ncol=len(self.ref_temp)+1,columnspacing=1)
             _arr[0][0].add_artist(legend1)
@@ -6980,15 +6987,16 @@ class ZPR_plotter(object):
         else:
             _fig, _arr = plt.subplots(1,1,figsize=self.figsize,squeeze=True)
 
+        _arr.set_rasterization_zorder(0)
         _arr.plot(self.pc1,self.ref_temp,marker='o',markersize=6,color='k',linewidth=1.5)
         _arr.plot(self.pc2,self.ref_temp,marker='o',markersize=6,color='k',linewidth=1.5)
         if not self.crossover:
-            _arr.fill_betweenx(self.ref_temp,self.pc1,self.pc2,color='gray',alpha=0.2)
-    #        _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#363256',alpha=0.6) #darkbluepurple
-            _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#6C70C8',alpha=0.6) #periwinkle
+            _arr.fill_betweenx(self.ref_temp,self.pc1,self.pc2,color='gray',alpha=0.2,zorder=-1, rasterized=True)
+    #        _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#363256',alpha=0.6,zorder=-1, rasterized=True) #darkbluepurple
+            _arr.fill_betweenx(self.ref_temp,self.pc2,self.pressure[-1]*np.ones(len(self.pc2)),color='#6C70C8',alpha=0.6,zorder=-1, rasterized=True) #periwinkle
 
 
-            legend_handles = [Line2D([0],[0],color='k',linewidth=1,linestyle='dotted',label=r'Static')]
+            legend_handles = [Line2D([0],[0],color='k',linewidth=1,linestyle='dotted',dashes=(2,4),label=r'Static')]
             legend1 = _arr.legend(handles=legend_handles, loc=3,fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1)
             _arr.add_artist(legend1)
 
@@ -7025,14 +7033,14 @@ class ZPR_plotter(object):
             cmap = mcolors.LinearSegmentedColormap.from_list("", self.cmap_cols)
 
             _arr.imshow(self.phase, extent = [self.pressure[0],self.pressure[-1], self.temp[0], self.temp[-1]], origin='lower', 
-                    aspect = 0.65*self.pressure[-1]/self.temp[-1],interpolation='bicubic', vmin=0, vmax=2,cmap=cmap)            
+                    aspect = 0.65*self.pressure[-1]/self.temp[-1],interpolation='bicubic', vmin=0, vmax=2,cmap=cmap,zorder=-1, rasterized=True)            
                                                                     # spline16, bilinear, bicubic
 
             legend_handles = [Line2D([0],[0],color=self.cmap_cols[0],linestyle='None',marker='s',markersize=16, label=r'$\mathbb{Z}_2=0$',markeredgecolor='k'),
                                 Line2D([0],[0],color=self.cmap_cols[1],linestyle='None',marker='s',markersize=16, label=r'WSM',markeredgecolor='k'),
                                 Line2D([0],[0],color=self.cmap_cols[2],linestyle='None',marker='s',markersize=16, label=r'$\mathbb{Z}_2=1$',markeredgecolor='k'),
-                                Line2D([0],[0],color='k',linestyle='dotted',linewidth=1.5, label=r'Static'),
-                                Line2D([0],[0],color='k', linestyle='solid',linewidth=1.5, label=r'P$_{\text{C}1}$,P$_{\text{C2}}$'),
+                                Line2D([0],[0],color='k',linestyle='dotted',linewidth=2.5, dashes=(2,4),label=r'Static'),
+                                Line2D([0],[0],color='k', linestyle='solid',linewidth=2.5, label=r'P$_{\text{C}1}$,P$_{\text{C2}}$'),
 #                                Line2D([0],[0],color='k', linestyle='dashed',linewidth=1.5,label=r'$\Delta$P')]
 ]
 
@@ -7043,8 +7051,8 @@ class ZPR_plotter(object):
 
 
         x = np.ones((len(self.ref_temp)))
-        _arr.plot(self.crit_pressure*x, self.ref_temp,'k:',linewidth=1.5)
-        _arr.plot(self.crit_pressure2*x, self.ref_temp,'k:',linewidth=1.5)
+        _arr.plot(self.crit_pressure*x, self.ref_temp,'k:',linewidth=1.5, dashes=(2,4))
+        _arr.plot(self.crit_pressure2*x, self.ref_temp,'k:',linewidth=1.5,dashes=(2,4))
         
 
         self.set_xaxis(_arr, self.pressure)
@@ -7767,7 +7775,10 @@ class ZPR_plotter(object):
 #        if self.vbcb == True:
 #            f.plot(zer,y,'k:')
 #        else:
-        f.plot(zer,y,color=col,linestyle=style)
+        if style=='dashed':
+            f.plot(zer,y,color=col,linestyle=style, dashes=(4,4))
+        else:
+            f.plot(zer,y,color=col,linestyle=style)
 
 
     def set_vrefs(self,f,x,val,style='solid'):
@@ -7783,7 +7794,10 @@ class ZPR_plotter(object):
     #        if self.vbcb==True:
     #            f.plot(x,zer,'k')
     #        else:
-        f.plot(x, zer, color='black', linestyle=style)
+        if style == 'dashed':
+            f.plot(x, zer, color='black', linestyle=style,dashes=(4,4))
+        else:
+            f.plot(x, zer, color='black', linestyle=style)
 
 
     def set_legend_pgap(self,f):
@@ -7872,10 +7886,12 @@ class ZPR_plotter(object):
         create_directory('figures/')
 
         if self.savefile:
-            g.savefig('figures/'+self.savefile+'.png')
-            os.system('open figures/{}.png'.format(self.savefile))
-            #g.savefig('figures/{}.eps'.format(self.savefile), format='eps',dpi=1200)
-            #os.system('open figures/{}.eps'.format(self.savefile))
+            if self.save_format == 'eps':
+                g.savefig('figures/{}.eps'.format(self.savefile), format='eps',dpi=1200)
+                os.system('open figures/{}.eps'.format(self.savefile))
+            else:
+                g.savefig('figures/{}.{}'.format(self.savefile,self.save_format))
+                os.system('open figures/{}.{}'.format(self.savefile,self.save_format))
 
         else:
             plt.show()
@@ -7884,9 +7900,14 @@ class ZPR_plotter(object):
 
         create_directory('figures/')
         if self.savefile:
-            outfile = 'figures/{}_PTphase.png'.format(self.savefile)
-            g.savefig(outfile)
-            os.system('open {}'.format(outfile))
+            if self.save_format == 'eps':
+                outfile = 'figures/{}_PTphase.eps'.format(self.savefile)
+                g.savefig(outfile,format='eps',dpi=1200)
+                os.system('open {}'.format(outfile))
+            else:
+                outfile = 'figures/{}_PTphase.{}'.format(self.savefile,self.save_format)
+                g.savefig(outfile)
+                os.system('open {}'.format(outfile))
         else:
             plt.show()
 
@@ -8015,6 +8036,7 @@ def plotter(
         cmap_cols = None,
         crossover = False,
         diagram_together = False,
+        save_format = 'png',
 
         **kwargs):
 
@@ -8107,6 +8129,7 @@ def plotter(
             read_correction_from_spline = read_correction_from_spline,
             crossover = crossover,
             diagram_together = diagram_together,
+            save_format = save_format,
 
             **kwargs)
             
