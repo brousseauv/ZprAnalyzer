@@ -7007,7 +7007,7 @@ class ZPR_plotter(object):
 
         else:
 
-            dim = 501
+            dim = 1001
             # Read delta_pc from file
             if not self.deltap_fname:
                 raise Exception('A file containing delta_p must be provided for crossover PT diagram.')
@@ -7019,6 +7019,9 @@ class ZPR_plotter(object):
 
             self.delta_pc1 = self.pc1-delta_pc1
             self.delta_pc2 = self.pc2+delta_pc2
+            self.delta_pc1_plus = self.pc1+delta_pc1
+            self.delta_pc2_minus = self.pc2-delta_pc2
+
             #Define meshgrid
             gridx, gridy = np.meshgrid(np.linspace(self.pressure[0], self.pressure[-1], dim), np.linspace(self.temp[0], self.temp[-1], dim))
             # pc1 and pc2 are still stored
@@ -7030,10 +7033,13 @@ class ZPR_plotter(object):
             self.phase = self.get_phase_grid(gridx,gridy,_arr)
 
 #            cmap = mcolors.LinearSegmentedColormap.from_list("", ["cornsilk","palegreen","mediumorchid"])
-            cmap = mcolors.LinearSegmentedColormap.from_list("", self.cmap_cols)
+            if self.cmap_cols:
+                cmap = mcolors.LinearSegmentedColormap.from_list("", self.cmap_cols)
+            else:
+                cmap = 'Blues'
 
             _arr.imshow(self.phase, extent = [self.pressure[0],self.pressure[-1], self.temp[0], self.temp[-1]], origin='lower', 
-                    aspect = 0.65*self.pressure[-1]/self.temp[-1],interpolation='bicubic', vmin=0, vmax=2,cmap=cmap,zorder=-1, rasterized=True)            
+                    aspect = 0.65*self.pressure[-1]/self.temp[-1],interpolation='bicubic', vmin=0, vmax=2,cmap=cmap,zorder=1, rasterized=False)            
                                                                     # spline16, bilinear, bicubic
 
             legend_handles = [Line2D([0],[0],color=self.cmap_cols[0],linestyle='None',marker='s',markersize=16, label=r'$\mathbb{Z}_2=0$',markeredgecolor='k'),
@@ -7041,7 +7047,6 @@ class ZPR_plotter(object):
                                 Line2D([0],[0],color=self.cmap_cols[2],linestyle='None',marker='s',markersize=16, label=r'$\mathbb{Z}_2=1$',markeredgecolor='k'),
                                 Line2D([0],[0],color='k',linestyle='dotted',linewidth=2.5, dashes=(2,4),label=r'Static'),
                                 Line2D([0],[0],color='k', linestyle='solid',linewidth=2.5, label=r'P$_{\text{C}1}$,P$_{\text{C2}}$'),
-#                                Line2D([0],[0],color='k', linestyle='dashed',linewidth=1.5,label=r'$\Delta$P')]
 ]
 
             legend2 = _arr.legend(handles = legend_handles, loc=9, bbox_to_anchor = (0.5,1.15), ncol = len(legend_handles),
@@ -7049,7 +7054,7 @@ class ZPR_plotter(object):
             _arr.add_artist(legend2)
 
 
-
+#        _arr.text(0.5,400,r'crossover $-\Delta,Tgauss$',fontsize=20,zorder=10)
         x = np.ones((len(self.ref_temp)))
         _arr.plot(self.crit_pressure*x, self.ref_temp,'k:',linewidth=1.5, dashes=(2,4))
         _arr.plot(self.crit_pressure2*x, self.ref_temp,'k:',linewidth=1.5,dashes=(2,4))
@@ -7086,10 +7091,13 @@ class ZPR_plotter(object):
         res = np.zeros((x.shape[0], y.shape[1]))
         # Define interpolated lines of pc1-delta_pc1, pc1, pc2, pc2+delta_pc2 as P(T) with interp1D
         # Store lines in a long array of lenght dim for each boundary
+        bound1m = np.zeros((dim))
         bound1 = np.zeros((dim))
+        bound1p = np.zeros((dim))
+        bound2m = np.zeros((dim))
         bound2 = np.zeros((dim))
-        bound3 = np.zeros((dim))
-        bound4 = np.zeros((dim))
+        bound2p = np.zeros((dim))
+
 
         for i in range(dim):
             t = y[i,i]
@@ -7097,27 +7105,35 @@ class ZPR_plotter(object):
 
             if loc<len(self.temp)-1:
                 line = interp1d(self.temp[loc:loc+2],self.delta_pc1[loc:loc+2], kind='slinear')
-                bound1[i] = line(t)
+                bound1m[i] = line(t)
 
                 line = interp1d(self.temp[loc:loc+2],self.pc1[loc:loc+2], kind='slinear')
-                bound2[i] = line(t)
+                bound1[i] = line(t)
+
+                line = interp1d(self.temp[loc:loc+2],self.delta_pc1_plus[loc:loc+2], kind='slinear')
+                bound1p[i] = line(t)
+
+                line = interp1d(self.temp[loc:loc+2],self.delta_pc2_minus[loc:loc+2], kind='slinear')
+                bound2m[i] = line(t)
 
                 line = interp1d(self.temp[loc:loc+2],self.pc2[loc:loc+2], kind='slinear')
-                bound3[i] = line(t)
+                bound2[i] = line(t)
 
                 line = interp1d(self.temp[loc:loc+2],self.delta_pc2[loc:loc+2], kind='slinear')
-                bound4[i] = line(t)
+                bound2p[i] = line(t)
 
             else:
-                bound1[i] = self.delta_pc1[-1]
-                bound2[i] = self.pc1[-1]
-                bound3[i] = self.pc2[-1]
-                bound4[i] = self.delta_pc2[-1]
+                bound1m[i] = self.delta_pc1[-1]
+                bound1[i] = self.pc1[-1]
+                bound1p[i] = self.delta_pc1_plus[-1]
+                bound2m[i] = self.delta_pc2_minus[-1]
+                bound2[i] = self.pc2[-1]
+                bound2p[i] = self.delta_pc2[-1]
 
-#        f.plot(bound1, y[:,0], 'r:',linewidth=2)
+#        f.plot(bound1m, y[:,0], 'r:',linewidth=2)
 #        f.plot(bound2, y[:,0], 'b:',linewidth=2)
 #        f.plot(bound3, y[:,0], 'c:',linewidth=2)
-#        f.plot(bound4, y[:,0], 'm:',linewidth=2)
+#        f.plot(bound2p, y[:,0], 'm',linewidth=2)
 
         for i,j in itt.product(range(dim),range(dim)):
             '''ligne horizontale'''
@@ -7132,26 +7148,65 @@ class ZPR_plotter(object):
 #            print(i,j,point[0], point[1])
 
             #For a given Temp value point[1], check where is P value point[0] is located, using boundary arrays
-            if point[0] <= bound1[i]:
-                # If trivial, assign value = -1
+            if point[0] <= bound1m[i]:
+                # If trivial, assign value = 0
                 res[i,j] = 0 
 
-            if point[0] >= bound2[i] and point[0] <= bound3[i]:
-                # If WSM (between pc1 and pc2) assign 0
+            if point[0] >= bound1[i] and point[0] <= bound2[i]:
+                # If WSM (between pc1 and pc2) assign 0 : for single crossover on P axis
                 res[i,j] = 1
 
-            if point[0] >= bound4[i]: 
-                # If topological, assign 1
+                # for double crossover on P and T axis
+                #linear
+ #               res[i,j] =  1- 0.3*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0])
+                #gaussian
+#                res[i,j] = np.exp(-(point[1]-self.temp[0])**2/(300**2))
+
+            # for double crossover on P axis
+#            if point[0] >= bound1p[i] and point[0] <= bound2m[i]:
+#                # If WSM (between pc1_plus and pc2_minus) assign 1
+#                res[i,j] = 1
+
+
+
+            if point[0] >= bound2p[i]: 
+                # If topological, assign 2
                 res[i,j] = 2
 
             # If within uncertaintoes from kbT, define value from linear interpolation between boundaries at T on the P axis
-            if point[0] > bound1[i] and point[0] < bound2[i]:
-                res[i,j] = (point[0]-bound1[i])/(bound2[i]-bound1[i])
+            #between pc1_m and pc1: for single crossover on P axis
+            if point[0] > bound1m[i] and point[0] < bound1[i]:
+                res[i,j] = (point[0]-bound1m[i])/(bound1[i]-bound1m[i])
+                #res[i,j] = 0.1 + 0.9*((point[0]-bound1[i]))/(bound2[i]-bound1[i])
+
+                # for double crossover on P and T axis
+                #linear
+#                res[i,j] = res[i,j]*(1 - 0.3*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0]))
+                #gaussian
+#                res[i,j] = res[i,j]*np.exp(-(point[1]-self.temp[0])**2/(300**2))
+
+            #between pc1_m and pc1_p : for double crossover on P axis
+#            if point[0] > bound1m[i] and point[0] < bound1p[i]:
+#                res[i,j] = (point[0]-bound1m[i])/(bound1p[i]-bound1m[i])
                 #res[i,j] = 0.1 + 0.9*((point[0]-bound1[i]))/(bound2[i]-bound1[i])
 
 
-            if point[0] > bound3[i] and point[0] < bound4[i]:
-                res[i,j] = 1 + (point[0]-bound3[i])/(bound4[i]-bound3[i])
+            # between pc2 and pc2_plus : for single crossover on P axis
+            if point[0] > bound2[i] and point[0] < bound2p[i]:
+                res[i,j] = 1 + (point[0]-bound2[i])/(bound2p[i]-bound2[i])
+#                res[i,j] = 1 + 0.85*(point[0]-bound3[i])/(bound4[i]-bound3[i])
+
+                # for double crossover on P and T axis
+                #linear
+                #res[i,j] = (point[0]-bound2[i])/(bound2p[i]-bound2[i]) +  (1 - 0.3*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0]))
+                #gaussian
+#                res[i,j] = res[i,j]*(1+np.exp(-(point[1]-self.temp[0])**2/(300**2)))
+#                res[i,j] = res[i,j]*(1 + 0.2*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0]))
+
+
+#            # between pc2_minus and pc2_plus : for double crossover on P axis
+#            if point[0] > bound2m[i] and point[0] < bound2p[i]:
+#                res[i,j] = 1 + (point[0]-bound2m[i])/(bound2p[i]-bound2m[i])
 #                res[i,j] = 1 + 0.85*(point[0]-bound3[i])/(bound4[i]-bound3[i])
 
 
@@ -7886,9 +7941,9 @@ class ZPR_plotter(object):
         create_directory('figures/')
 
         if self.savefile:
-            if self.save_format == 'eps':
-                g.savefig('figures/{}.eps'.format(self.savefile), format='eps',dpi=1200)
-                os.system('open figures/{}.eps'.format(self.savefile))
+            if self.save_format == 'eps' or self.save_format == 'pdf':
+                g.savefig('figures/{}.{}'.format(self.savefile,self.save_format), format=self.save_format,dpi=1200)
+                os.system('open figures/{}.{}'.format(self.savefile,self.save_format))
             else:
                 g.savefig('figures/{}.{}'.format(self.savefile,self.save_format))
                 os.system('open figures/{}.{}'.format(self.savefile,self.save_format))
@@ -7900,9 +7955,9 @@ class ZPR_plotter(object):
 
         create_directory('figures/')
         if self.savefile:
-            if self.save_format == 'eps':
-                outfile = 'figures/{}_PTphase.eps'.format(self.savefile)
-                g.savefig(outfile,format='eps',dpi=1200)
+            if self.save_format == 'eps' or self.save_format == 'pdf':
+                outfile = 'figures/{}_PTphase.{}'.format(self.savefile,self.save_format)
+                g.savefig(outfile,format='{}'.format(self.save_format),dpi=1200)
                 os.system('open {}'.format(outfile))
             else:
                 outfile = 'figures/{}_PTphase.{}'.format(self.savefile,self.save_format)
