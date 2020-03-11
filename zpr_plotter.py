@@ -6584,13 +6584,19 @@ class ZPR_plotter(object):
     def get_rashba_info(self, p):
 
         # Get Rashba energy and Rashba parameter alpha for each P,T
+        val = self.valence-1
 
         if self.pressure[p] < self.crit_pressure:
             a_idx = self.find_kpt_index([0.0, 0.0, 0.5])
         else:
             a_idx = self.find_kpt_index([0.0,0.0,0.53849])
 
-        energy = self.full_gap_energy_band[p,:,:]
+        energy = np.zeros((self.ntemp+1,2))
+        
+        for b in range(2):
+            energy[0,b] = np.abs(self.full_gap_energy_band[p,0,b] - self.eig0[0,a_idx,val+b])
+            energy[1:,b] = np.abs(self.full_gap_energy_band[p,1:,b] - self.eigcorr[0,a_idx,val+b,:])
+
 
         return energy
 
