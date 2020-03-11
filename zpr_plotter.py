@@ -28,8 +28,9 @@ from scipy.interpolate import interp1d
 
 # Tex settings
 rc('text', usetex = True)
-rc('font', family = 'serif',weight = 'bold')
-#rc('font', family = 'sans-serif',weight = 'bold')
+#rc('font', family = 'serif',weight = 'bold')
+rc('font', family = 'sans-serif',weight = 'bold')
+#rc('font',family='sans-serif')
 plt.rcParams['axes.unicode_minus'] = False
 params = {'text.latex.preamble' : [r'\usepackage{amsmath,amssymb}']}
 #r'\usepackage[utf8]{inputenc}',r'\DeclareUnicodeCharacter{2212}{$-$}',
@@ -287,10 +288,10 @@ class ZPRfile(CDFfile):
             self.indirect_gap_energy_band_split = ncdata.variables['indirect_gap_energy_band_split'][:,:,:]
             self.indirect_gap_ren_band_split = ncdata.variables['indirect_gap_renormalization_band_split'][:,:,:]
 
-#            self.fan_occ = ncdata.variables['reduced_fan_occ'][:,:,:,:]
-#            self.fan_unocc = ncdata.variables['reduced_fan_unocc'][:,:,:,:]
-#            self.ddw_occ = ncdata.variables['reduced_ddw_occ'][:,:,:,:]
-#            self.ddw_unocc = ncdata.variables['reduced_ddw_unocc'][:,:,:,:]
+            self.fan_occ = ncdata.variables['reduced_fan_occ'][:,:,:,:]
+            self.fan_unocc = ncdata.variables['reduced_fan_unocc'][:,:,:,:]
+            self.ddw_occ = ncdata.variables['reduced_ddw_occ'][:,:,:,:]
+            self.ddw_unocc = ncdata.variables['reduced_ddw_unocc'][:,:,:,:]
 
             status = ncdata.get_variables_by_attributes(name='corrected_eigenvalue_spline_interpolation')
             if status != []:
@@ -1271,21 +1272,44 @@ class ZPR_plotter(object):
 
 
             if self.split:
-                #conduction band
-                _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                #Valence band
-                _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                #Gap correction
-                _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                if self.linestyle[ifile] == 'dashed':
+                    #conduction band
+                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    #Valence band
+                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    #Gap correction
+                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                elif self.linestyle[ifile] == 'dotted':
+                    #conduction band
+                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    #Valence band
+                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    #Gap correction
+                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                else:
+                    #conduction band
+                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    #Valence band
+                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    #Gap correction
+                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+
+
 
 
             else:
-                _arr[0][0].plot(self.temp, self.band_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                _arr[1][0].plot(self.temp, self.band_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                _arr[2][0].plot(self.temp, self.gap_ren, marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                _arr[0][0].plot(self.temp, self.band_ren[:,1], marker='o', markersize=8, linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                _arr[1][0].plot(self.temp, self.band_ren[:,0], marker='o', markersize=8,linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                _arr[2][0].plot(self.temp, self.gap_ren, marker='o', markersize=8,linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
 
             if self.verbose:
                 side = 0 # 0 = HA, 1 = AL
@@ -1375,10 +1399,10 @@ class ZPR_plotter(object):
             if self.main_title:
                 self.set_title(_arr0[0][0], self.main_title)
 
-        legend1 = _arr[0][0].legend(loc=9,bbox_to_anchor=(0.5,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = file_qty,columnspacing=1)
+        legend1 = _arr[0][0].legend(loc=9,bbox_to_anchor=(0.5,1.28),fontsize=24, handletextpad=0.4,handlelength=1.0,frameon=True,ncol = file_qty,columnspacing=0.7)
         _arr[0][0].add_artist(legend1)
         
-        fig.subplots_adjust(hspace=0.0,top=0.91,right=0.95,bottom=0.1)
+        fig.subplots_adjust(hspace=0.0,top=0.91,right=0.90,bottom=0.10,left=0.12)
 
         if self.split:
             fig.align_ylabels()
@@ -2443,22 +2467,22 @@ class ZPR_plotter(object):
         if only:
             _arr[0][0].text(0.7,250, r'$\mathbb{Z}_2\!=\!0$',fontsize=24,color='k')
             _arr[0][0].text(2.7,250, r'$\mathbb{Z}_2\!=\!1$',fontsize=24,color='k')
-            _arr[0][0].text(1.90,200,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
-            _arr[0][0].text(1.50,210,r'Static',fontsize=20,color='#5A5A5A',weight='bold')
-            _arr[0][0].text(1.50,190,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
+            _arr[0][0].text(1.90,200,r'$\Rightarrow$',fontsize=26,color='#5A5A5A')
+            _arr[0][0].text(1.50,210,r'Static',fontsize=26,color='#5A5A5A',weight='bold')
+            _arr[0][0].text(1.50,190,r'WSM',fontsize=26,color='#5A5A5A',weight='bold')
 
             legend_handles = []
             legend_handles.append(Line2D([0],[0],color='k',linewidth=1.5,label=r'0 K Static'))
             for t,T in enumerate(self.ref_temp):
                 legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=1.5,label=r'{:>3.0f} K'.format(T)))
 
-            legend1 = _arr[0][0].legend(handles=legend_handles, loc=9, bbox_to_anchor=(0.5,1.15),fontsize=20,handletextpad=0.4,handlelength=1.4,frameon=True,ncol=len(self.ref_temp)+1,columnspacing=1)
+            legend1 = _arr[0][0].legend(handles=legend_handles, loc=9, bbox_to_anchor=(0.5,1.16),fontsize=24,handletextpad=0.4,handlelength=1.0,frameon=True,ncol=len(self.ref_temp)+1,columnspacing=0.7)
             _arr[0][0].add_artist(legend1)
 
             legend2_handles = []
-            legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
-            legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
-            legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol=1,labelspacing=0.1,borderpad=0.2)
+            legend2_handles.append(Line2D([0],[0],marker='d',markersize=12,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
+            legend2_handles.append(Line2D([0],[0],marker='o',markersize=12,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
+            legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=24, handletextpad=0.4,handlelength=1.4,frameon=True,ncol=1,labelspacing=0.1)
             _arr[0][0].add_artist(legend2)
 
         else:
@@ -3503,15 +3527,15 @@ class ZPR_plotter(object):
                     _arr2[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
 
                 else:
-                    _arr[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='d', markersize=7, linewidth=1.5, color=self.color[T], label=r'{} K'.format(self.ref_temp[T]))
-                    _arr[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='d', markersize=7, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
-                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d', markersize=7, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=r'{} K'.format(self.ref_temp[T]))
+                    _arr[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
 
                   #  _arr[2][0].legend(numpoints=1, loc= 'center right', bbox_to_anchor=(1.27,1.62), ncol=1, fontsize=20)
 
-                    _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=7, linewidth=1.5, color=self.color[T])
-                    _arr[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=7, linewidth=1.5, color=self.color[T])
-                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=7, linewidth=1.5, color=self.color[T])
+                    _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+                    _arr[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
 
                     if self.extrapolate_ren:
                         # plot extrapolated data
@@ -3610,10 +3634,10 @@ class ZPR_plotter(object):
                 self.set_title(_arr0[0][0], self.main_title)
 
         # Custum stuff
-        _arr[2][0].text(0.7,-82, r'$\mathbb{Z}_2\!=\!0$', fontsize=24,color='k')
-        _arr[2][0].text(2.7, -82, r'$\mathbb{Z}_2\!=\!1$',fontsize = 24,color='k')
-        _arr[2][0].text(1.85,-60,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
-        _arr[2][0].text(1.35,-60,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
+        _arr[2][0].text(0.7,-82, r'$\mathbb{Z}_2\!=\!0$', fontsize=32,color='k')
+        _arr[2][0].text(2.7, -82, r'$\mathbb{Z}_2\!=\!1$',fontsize = 32,color='k')
+        _arr[2][0].text(1.85,-60,r'$\Rightarrow$',fontsize=26,color='#5A5A5A')
+        _arr[2][0].text(1.35,-60,r'WSM',fontsize=26,color='#5A5A5A',weight='bold')
 
         legend_handles = [] 
         for t, temp in enumerate(self.ref_temp):
@@ -3622,16 +3646,16 @@ class ZPR_plotter(object):
         #legend_handles.append('')
         #legend_handles.append('')
 
-        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = len(self.ref_temp),columnspacing=1)
+        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.28),fontsize=24, handletextpad=0.4,handlelength=1.0,frameon=True,ncol = len(self.ref_temp),columnspacing=0.7)
         _arr[0][0].add_artist(legend1)
         
         legend2_handles=[]
-        legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
-        legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
-        legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1,borderpad=0.2)
+        legend2_handles.append(Line2D([0],[0],marker='d',markersize=12,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
+        legend2_handles.append(Line2D([0],[0],marker='o',markersize=12,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
+        legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.01,1.02),fontsize=24, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1)
         _arr[0][0].add_artist(legend2)
 
-        fig.subplots_adjust(hspace=0.0,top=0.90,right=0.95)
+        fig.subplots_adjust(hspace=0.0,top=0.90,right=0.95,left=0.12,bottom=0.09)
 
         if self.split:
             fig.align_ylabels()
@@ -4305,15 +4329,15 @@ class ZPR_plotter(object):
                     _arr2[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
 
                 else:
-                    _arr[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='d', markersize=7, linewidth=1.5, color=self.color[T], label=r'{} K'.format(self.ref_temp[T]))
-                    _arr[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='d', markersize=7, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
-                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d', markersize=7, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=r'{} K'.format(self.ref_temp[T]))
+                    _arr[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
 
                   #  _arr[2][0].legend(numpoints=1, loc= 'center right', bbox_to_anchor=(1.27,1.62), ncol=1, fontsize=20)
 
-                    _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=7, linewidth=1.5, color=self.color[T])
-                    _arr[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=7, linewidth=1.5, color=self.color[T])
-                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=7, linewidth=1.5, color=self.color[T])
+                    _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+                    _arr[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
 
 
             else:
@@ -4368,10 +4392,10 @@ class ZPR_plotter(object):
         self.set_yaxis(_arr[2][0], 'Gap ren ({})'.format(self.gap_units))
 
         # Custum stuff
-        _arr[2][0].text(0.7,-48, r'$\mathbb{Z}_2\!=\!0$', fontsize=24,color='k')
-        _arr[2][0].text(3.8, -48, r'$\mathbb{Z}_2\!=\!1$',fontsize = 24,color='k')
-        _arr[2][0].text(1.85,-25,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
-        _arr[2][0].text(1.35,-25,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
+        _arr[2][0].text(0.7,-48, r'$\mathbb{Z}_2\!=\!0$', fontsize=32,color='k')
+        _arr[2][0].text(3.8, -48, r'$\mathbb{Z}_2\!=\!1$',fontsize = 32,color='k')
+        _arr[2][0].text(1.85,-25,r'$\Rightarrow$',fontsize=26,color='#5A5A5A')
+        _arr[2][0].text(1.35,-25,r'WSM',fontsize=26,color='#5A5A5A',weight='bold')
 
 #        if self.main_title:
 #            self.set_title(_arr[0][0], self.main_title)
@@ -4411,16 +4435,17 @@ class ZPR_plotter(object):
         #legend_handles.append('')
         #legend_handles.append('')
 
-        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.3),fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = len(self.ref_temp),columnspacing=1)
+        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.28),fontsize=24, handletextpad=0.4,handlelength=1.0,frameon=True,ncol = len(self.ref_temp),columnspacing=0.7)
         _arr[0][0].add_artist(legend1)
         
         legend2_handles=[]
-        legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
-        legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
-        legend2 = _arr[1][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,0.28),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1,borderpad=0.2)
+        legend2_handles.append(Line2D([0],[0],marker='d',markersize=12,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
+        legend2_handles.append(Line2D([0],[0],marker='o',markersize=12,markerfacecolor='None', markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
+        legend2 = _arr[1][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.01,0.38),fontsize=24, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1,labelspacing=0.1)
+
         _arr[1][0].add_artist(legend2)
 
-        fig.subplots_adjust(hspace=0.0,top=0.90,right=0.95)
+        fig.subplots_adjust(hspace=0.0,bottom=0.09,top=0.90,right=0.95,left=0.14)
 
         if self.split:
             fig.align_ylabels()
@@ -5735,6 +5760,8 @@ class ZPR_plotter(object):
                     self.full_gap_energy = np.zeros((file_qty, self.ntemp+1))
                     self.full_gap_energy_band = np.zeros((file_qty, self.ntemp+1,2))
                     self.full_energy0 = np.zeros((file_qty))
+                    self.gap_loc_coordinates = np.zeros((file_qty, self.ntemp+1,2,3))
+                    self.rashba_energy = np.zeros((file_qty, self.ntemp+1, 2)) # P,T,VB/CB
                     full_energy = np.zeros((file_qty,self.ntemp))
                     self.ref_temp = self.temp
             else:
@@ -5759,6 +5786,12 @@ class ZPR_plotter(object):
 
             if self.indirect:
                 self.full_gap_loc[ifile,:,:], self.full_gap_energy[ifile,:], self.full_gap_ren[ifile,:], self.full_gap_energy_band[ifile,:,:],self.full_gap_ren_band[ifile,:,:] = self.get_indirect_gap_info(self.eig0, self.eigcorr,False)
+                for tt in range(self.ntemp+1):
+                    self.gap_loc_coordinates[ifile,tt,0,:] = self.kpoints[int(self.full_gap_loc[ifile,tt,0])]
+                    self.gap_loc_coordinates[ifile,tt,1,:] = self.kpoints[int(self.full_gap_loc[ifile,tt,1])]
+
+                self.rashba_energy[ifile,:,:] = self.get_rashba_info(ifile)
+
             else:
                 raise Exception('Direct gap not yet implemented, get to work!')
 
@@ -6265,14 +6298,14 @@ class ZPR_plotter(object):
 #                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='Static T=0')
                             if crit_index2 is not None:
                                 if only:
-                                     _arr[0][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=7, color='black', label='Static T=0')
+                                     _arr[0][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=8, color='black', label='Static T=0')
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=7, color='black', label='Static T=0')
+                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=8, color='black', label='Static T=0')
                             else:
                                 if only:
-                                     _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', markersize=7,color='black', label='Static T=0')
+                                     _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', markersize=8,color='black', label='Static T=0')
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d',markersize=7, color='black', label='Static T=0')
+                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d',markersize=8, color='black', label='Static T=0')
 
                         else:
                             if only:
@@ -6283,11 +6316,11 @@ class ZPR_plotter(object):
 #                        _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
     
                     if only:
-                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=7, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
                     else:
-                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d',markersize=7, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d',markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
         #                self.set_legend_gap(_arr[0][0])
-                        _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=7, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                        _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
                 #        _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='o', color='black', label='interpolated')
 
     #                if only:
@@ -6325,17 +6358,17 @@ class ZPR_plotter(object):
 #
                             if crit_index2 is not None:
                                 if only:
-                                     _arr[0][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=7, color='black', label=None)
+                                     _arr[0][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=8, color='black', label=None)
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=7, color='black', label=None)
+                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=8, color='black', label=None)
 
                     if only:
-                        _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=8, linewidth=2.0, color=self.color[T])
                         _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
 
                     else:
-                        _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
-                        _arr[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=7, linewidth=2.0, color=self.color[T])
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o',markersize=8, linewidth=2.0, color=self.color[T])
+                        _arr[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=8, linewidth=2.0, color=self.color[T])
 
                         _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
                         _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
@@ -6505,24 +6538,24 @@ class ZPR_plotter(object):
 
         # Custom text
         if only:
-            _arr[0][0].text(0.7,250, r'$\mathbb{Z}_2\!=\!0$',fontsize=24,color='k')
-            _arr[0][0].text(2.7,250, r'$\mathbb{Z}_2\!=\!1$',fontsize=24,color='k')
-            _arr[0][0].text(1.90,200,r'$\Rightarrow$',fontsize=20,color='#5A5A5A')
-            _arr[0][0].text(1.50,210,r'Static',fontsize=20,color='#5A5A5A',weight='bold')
-            _arr[0][0].text(1.50,190,r'WSM',fontsize=20,color='#5A5A5A',weight='bold')
+            _arr[0][0].text(0.7,250, r'$\mathbb{Z}_2\!=\!0$',fontsize=32,color='k')
+            _arr[0][0].text(2.7,250, r'$\mathbb{Z}_2\!=\!1$',fontsize=32,color='k')
+            _arr[0][0].text(1.90,200,r'$\Rightarrow$',fontsize=26,color='#5A5A5A')
+            _arr[0][0].text(1.44,210,r'Static',fontsize=26,color='#5A5A5A',weight='bold')
+            _arr[0][0].text(1.44,190,r'WSM',fontsize=26,color='#5A5A5A',weight='bold')
 
             legend_handles = []
-            legend_handles.append(Line2D([0],[0],color='k',linewidth=2.5,label=r'0 K Static'))
+            legend_handles.append(Line2D([0],[0],color='k',linewidth=2.5,label=r'Static'))
             for t,T in enumerate(self.ref_temp):
                 legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=2.5,label=r'{:>3.0f} K'.format(T)))
 
-            legend1 = _arr[0][0].legend(handles=legend_handles, loc=9, bbox_to_anchor=(0.5,1.15),fontsize=20,handletextpad=0.4,handlelength=1.4,frameon=True,ncol=len(self.ref_temp)+1,columnspacing=1)
+            legend1 = _arr[0][0].legend(handles=legend_handles, loc=9, bbox_to_anchor=(0.5,1.16),fontsize=24,handletextpad=0.4,handlelength=1.0,frameon=True,ncol=len(self.ref_temp)+1,columnspacing=0.7)
             _arr[0][0].add_artist(legend1)
 
             legend2_handles = []
-            legend2_handles.append(Line2D([0],[0],marker='d',markersize=8,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
-            legend2_handles.append(Line2D([0],[0],marker='o',markersize=8,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
-            legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=16, handletextpad=0.4,handlelength=1.4,frameon=True,ncol=1,labelspacing=0.1,borderpad=0.2)
+            legend2_handles.append(Line2D([0],[0],marker='d',markersize=12,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C1}}$ plane'))
+            legend2_handles.append(Line2D([0],[0],marker='o',markersize=12,markerfacecolor='None',markeredgecolor='k', linestyle='None',label=r'P$_{\text{C2}}$ plane'))
+            legend2 = _arr[0][0].legend(handles=legend2_handles, loc=1,bbox_to_anchor=(1.0,1.0),fontsize=24, handletextpad=0.4,handlelength=1.4,frameon=True,ncol=1,labelspacing=0.1)
             _arr[0][0].add_artist(legend2)
 
         else:
@@ -6545,7 +6578,66 @@ class ZPR_plotter(object):
             else:
                 self.save_figure(fig)
 
+        self.write_full_gap_loc()
 
+
+    def get_rashba_info(self, p):
+
+        # Get Rashba energy and Rashba parameter alpha for each P,T
+
+        if self.pressure[p] < self.crit_pressure:
+            a_idx = self.find_kpt_index([0.0, 0.0, 0.5])
+        else:
+            a_idx = self.find_kpt_index([0.0,0.0,0.53849])
+
+        energy = self.full_gap_energy_band[p,:,:]
+
+        return energy
+
+    def write_full_gap_loc(self):
+
+        # write full EPI+TE indirect gap info to netcdf file
+        fname = 'total_gap_PT_loc.nc'
+
+        with nc.Dataset(fname,'w') as ncdata:
+
+            ncdata.createDimension('number_of_temperatures',self.ntemp)
+            ncdata.createDimension('number_of_pressures', len(self.pressure))
+            ncdata.createDimension('two',2)
+            ncdata.createDimension('three', 3)
+
+            data = ncdata.createVariable('temperature','d',('number_of_temperatures'))
+            data[:] = self.ref_temp[:]
+            data.units = 'K'
+
+            data = ncdata.createVariable('pressure','d',('number_of_pressures'))
+            data[:] = self.pressure[:]
+            data.units = 'GPa'
+
+#np.zeros((file_qty, self.ntemp+1,2)) , self.kpoints
+            data = ncdata.createVariable('total_bare_gap_location','d',('number_of_pressures','two', 'three'))
+            data[:,0,:] = self.gap_loc_coordinates[:,0,0,:]       
+            data[:,1,:] = self.gap_loc_coordinates[:,0,1,:] 
+                
+            data = ncdata.createVariable('total_gap_location_temperature_dependent','d',('number_of_pressures','number_of_temperatures','two','three'))
+            data[:,:,0,:] = self.gap_loc_coordinates[:,1:,0,:]
+            data[:,:,1,:] = self.gap_loc_coordinates[:,1:,1,:]
+
+        #    data = ncdata.createVariable('bare_bandgap_energy','d',('number_of_pressures'))
+        #    data[:] = self.full_gap_energy[:,0#]
+#            data.units = self.units
+
+            data = ncdata.createVariable('total_bandgap_energy_temperature_dependent','d', ('number_of_pressures','number_of_temperatures'))
+            data[:,:] = self.full_gap_energy[:,:]
+            data.units = self.units
+
+            data = ncdata.createVariable('bare_rashba_energy','d',('number_of_pressures','two'))
+            data[:,:] = self.rashba_energy[:,0,:]
+            data.units = self.units
+
+            data = ncdata.createVariable('rashba_energy','d',('number_of_pressures','number_of_temperatures','two'))
+            data[:,:,:] = self.rashba_energy[:,1:,:]
+            data.units = self.units
 
 
 
@@ -6997,12 +7089,12 @@ class ZPR_plotter(object):
 
 
             legend_handles = [Line2D([0],[0],color='k',linewidth=1,linestyle='dotted',dashes=(2,4),label=r'Static')]
-            legend1 = _arr.legend(handles=legend_handles, loc=3,fontsize=20, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1)
+            legend1 = _arr.legend(handles=legend_handles, loc=3,fontsize=24, handletextpad=0.4,handlelength=1.4,frameon=True,ncol = 1)
             _arr.add_artist(legend1)
 
-            _arr.text(0.8,400,r'$\mathbb{Z}_2=0$',fontsize=24)
-            _arr.text(3.7,400,r'$\mathbb{Z}_2=1$',fontsize=24)
-            _arr.text(2.3,400,r'WSM',fontsize=24,color='#5A5A5A')
+            _arr.text(0.8,400,r'$\mathbb{Z}_2=0$',fontsize=32)
+            _arr.text(3.7,400,r'$\mathbb{Z}_2=1$',fontsize=32)
+            _arr.text(2.3,400,r'WSM',fontsize=26,color='#5A5A5A')
 
 
         else:
@@ -7017,8 +7109,25 @@ class ZPR_plotter(object):
                 delta_pc1 = ncdata.variables['delta_p_trivial_phase'][:]
                 delta_pc2 = ncdata.variables['delta_p_topological_phase'][:]
 
-            self.delta_pc1 = self.pc1-delta_pc1
-            self.delta_pc2 = self.pc2+delta_pc2
+            b1 = np.zeros(len(delta_pc1))
+            b2 = np.zeros(len(delta_pc2))
+
+            inc = True
+            if inc:
+                inc1 = [1.0,1.00,1.00,1.00,1.01,1.03]
+                inc2 = [1.0,1.00,1.00,1.20,1.50,1.8]
+
+                for i in range(len(delta_pc1)):
+                    b1[i] = inc1[i]*delta_pc1[i]
+                    b2[i] = inc2[i]*delta_pc2[i]
+
+                self.delta_pc1 = self.pc1-b1
+                self.delta_pc2 = self.pc2+b2
+
+            else:
+                self.delta_pc1 = self.pc1-delta_pc1
+                self.delta_pc2 = self.pc2+delta_pc2
+
             self.delta_pc1_plus = self.pc1+delta_pc1
             self.delta_pc2_minus = self.pc2-delta_pc2
 
@@ -7030,6 +7139,9 @@ class ZPR_plotter(object):
 #            _arr.plot(self.delta_pc2, self.ref_temp, marker='s',color='k', linestyle = 'dashed',linewidth=1.5)
 
             # define a value for each point in the grid, depending on its location vs the phase boundaries
+
+#            _arr.plot(self.pc1-delta_pc1, self.temp, 'r',linewidth=2)
+#            _arr.plot(self.pc2+delta_pc2, self.temp, 'r',linewidth=2)
             self.phase = self.get_phase_grid(gridx,gridy,_arr)
 
 #            cmap = mcolors.LinearSegmentedColormap.from_list("", ["cornsilk","palegreen","mediumorchid"])
@@ -7042,19 +7154,19 @@ class ZPR_plotter(object):
                     aspect = 0.65*self.pressure[-1]/self.temp[-1],interpolation='bicubic', vmin=0, vmax=2,cmap=cmap,zorder=1, rasterized=False)            
                                                                     # spline16, bilinear, bicubic
 
-            legend_handles = [Line2D([0],[0],color=self.cmap_cols[0],linestyle='None',marker='s',markersize=16, label=r'$\mathbb{Z}_2=0$',markeredgecolor='k'),
-                                Line2D([0],[0],color=self.cmap_cols[1],linestyle='None',marker='s',markersize=16, label=r'WSM',markeredgecolor='k'),
-                                Line2D([0],[0],color=self.cmap_cols[2],linestyle='None',marker='s',markersize=16, label=r'$\mathbb{Z}_2=1$',markeredgecolor='k'),
+            legend_handles = [Line2D([0],[0],color=self.cmap_cols[0],linestyle='None',marker='s',markersize=20, label=r'$\mathbb{Z}_2=0$',markeredgecolor='k'),
+                                Line2D([0],[0],color=self.cmap_cols[1],linestyle='None',marker='s',markersize=20, label=r'WSM',markeredgecolor='k'),
+                                Line2D([0],[0],color=self.cmap_cols[2],linestyle='None',marker='s',markersize=20, label=r'$\mathbb{Z}_2=1$',markeredgecolor='k'),
                                 Line2D([0],[0],color='k',linestyle='dotted',linewidth=2.5, dashes=(2,4),label=r'Static'),
                                 Line2D([0],[0],color='k', linestyle='solid',linewidth=2.5, label=r'P$_{\text{C}1}$,P$_{\text{C2}}$'),
 ]
 
-            legend2 = _arr.legend(handles = legend_handles, loc=9, bbox_to_anchor = (0.5,1.15), ncol = len(legend_handles),
-                            fontsize=20,handletextpad=0.4,frameon=True,handlelength=1.4,columnspacing=1.5)
+            legend2 = _arr.legend(handles = legend_handles, loc=9, bbox_to_anchor = (0.5,1.16), ncol = len(legend_handles),
+                            fontsize=24,handletextpad=0.4,frameon=True,handlelength=1.4,columnspacing=1.0)
             _arr.add_artist(legend2)
 
 
-#        _arr.text(0.5,400,r'crossover $-\Delta,Tgauss$',fontsize=20,zorder=10)
+        #_arr.text(0.5,400,r'T crossover',fontsize=24,zorder=10)
         x = np.ones((len(self.ref_temp)))
         _arr.plot(self.crit_pressure*x, self.ref_temp,'k:',linewidth=1.5, dashes=(2,4))
         _arr.plot(self.crit_pressure2*x, self.ref_temp,'k:',linewidth=1.5,dashes=(2,4))
@@ -7130,10 +7242,13 @@ class ZPR_plotter(object):
                 bound2[i] = self.pc2[-1]
                 bound2p[i] = self.delta_pc2[-1]
 
-#        f.plot(bound1m, y[:,0], 'r:',linewidth=2)
+#        f.plot(bound1m, y[:,0], 'r',linewidth=2)
 #        f.plot(bound2, y[:,0], 'b:',linewidth=2)
 #        f.plot(bound3, y[:,0], 'c:',linewidth=2)
 #        f.plot(bound2p, y[:,0], 'm',linewidth=2)
+
+#        bound1m = 0.9*bound1m
+#        bound2p = 1.1*bound2p
 
         for i,j in itt.product(range(dim),range(dim)):
             '''ligne horizontale'''
@@ -7158,7 +7273,7 @@ class ZPR_plotter(object):
 
                 # for double crossover on P and T axis
                 #linear
- #               res[i,j] =  1- 0.3*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0])
+                res[i,j] =  1- 0.3*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0])
                 #gaussian
 #                res[i,j] = np.exp(-(point[1]-self.temp[0])**2/(300**2))
 
@@ -7181,7 +7296,7 @@ class ZPR_plotter(object):
 
                 # for double crossover on P and T axis
                 #linear
-#                res[i,j] = res[i,j]*(1 - 0.3*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0]))
+                res[i,j] = res[i,j]*(1 - 0.3*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0]))
                 #gaussian
 #                res[i,j] = res[i,j]*np.exp(-(point[1]-self.temp[0])**2/(300**2))
 
@@ -7197,11 +7312,13 @@ class ZPR_plotter(object):
 #                res[i,j] = 1 + 0.85*(point[0]-bound3[i])/(bound4[i]-bound3[i])
 
                 # for double crossover on P and T axis
-                #linear
-                #res[i,j] = (point[0]-bound2[i])/(bound2p[i]-bound2[i]) +  (1 - 0.3*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0]))
+                #linear renormalized (not really good)
+#                res[i,j] = (point[0]-bound2[i])/(bound2p[i]-bound2[i]) +  (1 - 0.3*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0]))
                 #gaussian
 #                res[i,j] = res[i,j]*(1+np.exp(-(point[1]-self.temp[0])**2/(300**2)))
-#                res[i,j] = res[i,j]*(1 + 0.2*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0]))
+
+                #this one is the good one
+                res[i,j] = res[i,j]*(1 + 0.2*(point[1]-self.temp[0])/(self.temp[-1]-self.temp[0]))
 
 
 #            # between pc2_minus and pc2_plus : for double crossover on P axis
@@ -7348,7 +7465,7 @@ class ZPR_plotter(object):
         for k,kpoint in enumerate(lst):
             index = np.allclose(loclst,kpoint)
             if index==True:
-                print(index,k)
+        #        print(index,k)
                 return k
 
 
@@ -7516,7 +7633,7 @@ class ZPR_plotter(object):
         # Finds the location of the unperturbed and perturbed direct gap + computes the gap energy
         val = self.valence - 1
         cond = val + 1
-        print(val, cond)
+        #print(val, cond)
 
         if self.spline:
             # Interpolate kpoints
@@ -7551,8 +7668,8 @@ class ZPR_plotter(object):
            
                 arrc = pert[0,:,cond,i]
                 arrv = pert[0,:,val,i]
-                loc[i+1,0] = np.argmax(arrv)
-                loc[i+1,1] = np.argmin(arrc)
+                loc[i+1,0] = int(np.argmax(arrv))
+                loc[i+1,1] = int(np.argmin(arrc))
                 ener_band[i+1,0] = arrv[loc[i+1,0]] 
                 ener_band[i+1,1] = arrc[loc[i+1,1]] 
                 ener[i+1] = ener_band[i+1,1] - ener_band[i+1,0] 
@@ -7670,19 +7787,19 @@ class ZPR_plotter(object):
         loclst = list(loc)
         if self.spline:
             lst = [list(x) for x in self.kpoints_fine]
-        elif self.reduce_path:
-            lst = [list(x) for x in self.reduced_kpath]
+#        elif self.reduce_path:
+#            lst = [list(x) for x in self.reduced_kpath]
         else:
             lst = [list(x) for x in self.kpoints]
 
         for k,kpoint in enumerate(lst):
             index = np.allclose(loclst,kpoint)
             if index==True:
-                print(kpoint)
+               # print(kpoint)
                 return k
 
-    def renormalize_0K_data(self):
-        print(np.shape(self.full_band_ren), np.shape(self.full_gap_ren))
+#    def renormalize_0K_data(self):
+#        print(np.shape(self.full_band_ren), np.shape(self.full_gap_ren))
         #self.full_band_ren = self.full_band_ren - 
     #full_band_ren, full_gap_ren
 
@@ -7707,10 +7824,10 @@ class ZPR_plotter(object):
 
         if self.gap:
             cut = 0.02*max(self.temp)
-            lims = (0, 1.01*max(self.temp))
+            lims = (-5, 1.01*max(self.temp))
             f.set_xlim(lims)
-            f.set_xlabel('Temperature (K)', fontsize=24)
-            plt.setp(f.get_xticklabels(), fontsize=20, weight='bold')
+            f.set_xlabel('Temperature (K)', fontsize=32)
+            plt.setp(f.get_xticklabels(), fontsize=26, weight='bold')
 #            f.xaxis.set_tick_params(labelsize=16)
 #            if not self.xlims:
 #                self.xlims = [min(x), max(x)]
@@ -7732,21 +7849,21 @@ class ZPR_plotter(object):
             f.set_xlim(lims)
             f.xaxis.set_major_formatter(FuncFormatter(self.label_formatter))
 
-            plt.setp(f.get_xticklabels(), fontsize=20, weight='bold')
+            plt.setp(f.get_xticklabels(), fontsize=26, weight='bold')
             if self.separate_bands:
-                f.set_xlabel('Pressure (GPa)', fontsize=24)
+                f.set_xlabel('Pressure (GPa)', fontsize=32)
             else:
-                f.set_xlabel('Pressure (GPa)',fontsize=24)
+                f.set_xlabel('Pressure (GPa)',fontsize=32)
 
     def set_temp_yaxis(self,f,lab,temp):
 
-        f.set_ylabel(lab, fontsize = 24)
+        f.set_ylabel(lab, fontsize = 32)
 
         f.set_ylim(temp[0],temp[-1])
 
         f.yaxis.set_major_formatter(FuncFormatter(self.label_formatter))
 
-        plt.setp(f.get_yticklabels(), fontsize=20, weight='bold')
+        plt.setp(f.get_yticklabels(), fontsize=26, weight='bold')
 #        if self.yminorticks:
 #            f.yaxis.set_minor_locator(AutoMinorLocator(self.yminorticks+1))
 
@@ -7758,7 +7875,7 @@ class ZPR_plotter(object):
             f.set_ylabel(lab, fontsize=14)
             
         else:
-            f.set_ylabel(lab, fontsize = 24)
+            f.set_ylabel(lab, fontsize = 32)
 
 
             if self.ylims is not None:
@@ -7770,16 +7887,16 @@ class ZPR_plotter(object):
         f.yaxis.set_major_formatter(FuncFormatter(self.label_formatter))
 
         if self.yticks is not None:
-            plt.setp(f.get_yticklabels(), fontsize=20)
+            plt.setp(f.get_yticklabels(), fontsize=26)
             f.set_yticks(np.arange(self.yticks[0], self.yticks[1]+self.yticks[2], self.yticks[2]))
         else:
-            plt.setp(f.get_yticklabels(), fontsize=20, weight='bold')
+            plt.setp(f.get_yticklabels(), fontsize=26, weight='bold')
         if self.yminorticks:
             f.yaxis.set_minor_locator(AutoMinorLocator(self.yminorticks+1))
 
     def set_yaxis_separate(self,f, lab,lims=None,ticks=None):
 
-        f.set_ylabel(lab, fontsize = 24)
+        f.set_ylabel(lab, fontsize = 32)
         
         if lims is not None:
             f.set_ylim(lims) 
@@ -7790,10 +7907,10 @@ class ZPR_plotter(object):
         f.yaxis.set_major_formatter(FuncFormatter(self.label_formatter))
 
         if ticks is not None:
-            plt.setp(f.get_yticklabels(), fontsize=20)
+            plt.setp(f.get_yticklabels(), fontsize=26)
             f.set_yticks(np.arange(ticks[0], ticks[1]+ticks[2], ticks[2]))
         else:
-            plt.setp(f.get_yticklabels(), fontsize=20, weight='bold')
+            plt.setp(f.get_yticklabels(), fontsize=26, weight='bold')
         if self.yminorticks:
             f.yaxis.set_minor_locator(AutoMinorLocator(self.yminorticks+1))
 
