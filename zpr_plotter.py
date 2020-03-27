@@ -398,6 +398,7 @@ class ZPR_plotter(object):
     # Options
     figsize = (20,9)
     color = None
+    color_from_cmap = None
     labels = None
     linestyle = None
     ylims = None
@@ -423,7 +424,7 @@ class ZPR_plotter(object):
     title = None
     savefile = None
     degen = None
-    cmap_cols = None
+    cmap_cols = None #this one is for the PT phase diagram only. modify its name!!!
 
     renormalization = True
     spectral = False
@@ -460,6 +461,7 @@ class ZPR_plotter(object):
             # Options
             figsize = (20,9),
             color = None,
+            color_from_cmap = None,
             linestyle = None,
             labels = None,
             ylims = None,
@@ -576,6 +578,7 @@ class ZPR_plotter(object):
         # Define options
         self.figsize = figsize
         self.color = color
+        self.color_from_cmap = color_from_cmap
         self.labels = labels
         self.linestyle = linestyle
         self.ylims = ylims
@@ -3179,7 +3182,7 @@ class ZPR_plotter(object):
         else:
             crit_index = None
 #        print(crit_index)
-
+        lstyle = ['solid',(0,(4,4,1,4,1,4)),'dotted',(0,(5,3,1,3)),'dashed','solid']
         for T in range(self.ntemp):
 
             if crit_index is not None:
@@ -3376,9 +3379,15 @@ class ZPR_plotter(object):
                     self.full_gap_ren = np.zeros((file_qty, self.ntemp))
                     self.full_band_ren = np.zeros((file_qty,self.ntemp,2))
                     self.ref_temp = self.temp
+
+                if self.color_from_cmap is not None:
+                    print('setting cmap color')
+                    self.color = self.set_colors_from_colormap(self.color_from_cmap)
+
             else:
                 if np.array_equal(self.temp,self.ref_temp) == False:
                     raise Exception('All files must have the same temperature array! Please correct file #{}.'.format(ifile+1))
+
 
             if self.ntemp > len(self.color):
                 raise Exception('Color vector is not long enough! Please provide {} color list.'.format(self.ntemp))
@@ -3497,6 +3506,8 @@ class ZPR_plotter(object):
 #                print(ifile, T, gap_index)
 
 #############################################
+        #lstyle = ['solid',(0,(3,1,1,1,1,1)),(0,(1,1)),(0,(3,1,1,1)),(0,(3,1)),'solid']
+        lstyle = ['solid','solid','solid','solid','solid','solid']
         # Start plotting
         for T in range(self.ntemp):
 
@@ -3527,15 +3538,15 @@ class ZPR_plotter(object):
                     _arr2[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
 
                 else:
-                    _arr[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=r'{} K'.format(self.ref_temp[T]))
-                    _arr[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
-                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='d', markersize=8, linestyle=lstyle[T], linewidth=3.0, color=self.color[T], label=r'{} K'.format(self.ref_temp[T]))
+                    _arr[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='d', markersize=8, linestyle=lstyle[T], linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d', markersize=8, linestyle=lstyle[T], linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
 
                   #  _arr[2][0].legend(numpoints=1, loc= 'center right', bbox_to_anchor=(1.27,1.62), ncol=1, fontsize=20)
 
-                    _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
-                    _arr[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
-                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+                    _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=8, linestyle=lstyle[T], linewidth=3.0, color=self.color[T])
+                    _arr[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=8, linestyle=lstyle[T], linewidth=3.0, color=self.color[T])
+                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=8, linestyle=lstyle[T], linewidth=3.0, color=self.color[T])
 
                     if self.extrapolate_ren:
                         # plot extrapolated data
@@ -3641,12 +3652,16 @@ class ZPR_plotter(object):
 
         legend_handles = [] 
         for t, temp in enumerate(self.ref_temp):
-            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=2.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
+#            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=5.0, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
+            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=5.0, label=r'{:>3.0f} K'.format(self.ref_temp[t]),linestyle=lstyle[t]))
+
 #                Line2D([0],[0],color='b',marker='o',markersize=8,linestyle='None',label=r'P$_{\text{C2}}$ plane')]
         #legend_handles.append('')
         #legend_handles.append('')
 
         legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.5,1.28),fontsize=24, handletextpad=0.4,handlelength=1.0,frameon=True,ncol = len(self.ref_temp),columnspacing=0.7)
+#        legend1 = _arr[0][0].legend(handles=legend_handles, loc=9,bbox_to_anchor=(0.46,1.28),fontsize=24, handletextpad=0.4,handlelength=1.65,frameon=True,ncol = len(self.ref_temp),columnspacing=0.4)
+
         _arr[0][0].add_artist(legend1)
         
         legend2_handles=[]
@@ -5569,6 +5584,7 @@ class ZPR_plotter(object):
 
         if self.split:
             raise Exception('split not yet implemented for te_pgap')
+
             if only:
                 fig2, _arr2 = plt.subplots(1,1, figsize=self.figsize, squeeze=False, sharex=True)
             else:
@@ -5726,6 +5742,12 @@ class ZPR_plotter(object):
             self.correction = np.zeros((self.nsppol,self.nkpt, self.max_band, self.ntemp))
             self.eigcorr = np.zeros((self.nsppol,self.nkpt, self.max_band, self.ntemp))
 
+#            '''
+#            REMOVE aindex!!! this is just to test the A-L correction in Pc1...
+#            '''
+#            aindex = self.find_kpt_index([0.0,0.0,0.5])
+#            print(aindex)
+
 #            print(te_file.correction[0,:,27,-1])
             for t in range(self.ntemp):
                 if self.max_band is not None:
@@ -5734,11 +5756,19 @@ class ZPR_plotter(object):
                 else:
                     self.correction = te_file.correction + zpr_correction
                     self.eigcorr = self.eig0 + self.correction
+
+#                if ifile > 3:#'''remove me!!'''
+#                    if t==0:
+#                        print('shifting on H-A side...')
+#                    self.correction[:,:aindex,:self.valence,:] -= 10
+#                    self.correction[:,:aindex,self.valence:,:] += 10
+#                    self.eigcorr[:,:aindex,:self.valence,:] -= 10
+#                    self.eigcorr[:,:aindex,self.valence:,:] += 10
+
 #            print(self.correction[0,:,27,-1])
             ###here###
             
         #    print(te_file.correction[0,440:480,28,0])
-            
             # Initialize plotting arrays
             if ifile==0:
                 if self.split: # distinct data for left and rifht gap
@@ -5764,6 +5794,11 @@ class ZPR_plotter(object):
                     self.rashba_energy = np.zeros((file_qty, self.ntemp+1, 2)) # P,T,VB/CB
                     full_energy = np.zeros((file_qty,self.ntemp))
                     self.ref_temp = self.temp
+
+                if self.color_from_cmap is not None:
+                    print('setting cmap color')
+                    self.color = self.set_colors_from_colormap(self.color_from_cmap)
+
             else:
                 if np.array_equal(self.temp,self.ref_temp) == False:
                     raise Exception('All files must have the same temperature array! Please correct file #{}.'.format(ifile+1))
@@ -6143,6 +6178,12 @@ class ZPR_plotter(object):
 #        print(self.extr_pressure2)
 #        print(self.extr_full_gap_energy2)
 
+######################################
+        ## Start plotting here ###
+        
+        lstyle = ['solid',(0,(3,1,1,1,1,1)),(0,(1,1)),(0,(3,1,1,1)),(0,(3,1)),'solid']
+#        lstyle = ['solid','solid','solid','solid','solid','solid']
+
         for T in range(self.ntemp):
             if crit_index is not None:
                 s = crit_index+1
@@ -6155,9 +6196,9 @@ class ZPR_plotter(object):
 #                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='Static T=0')
                             if self.crit_index2 is not None:
                                 if only:
-                                    _arr[0][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
+                                    _arr[0][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0',linewidth=1.5)
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0')
+                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+2], self.explicit_gap_energies[:crit_index2+2],marker='d', color='black', label='Static T=0',linewidth=1.5)
 
                             else:
                                 if only:
@@ -6177,19 +6218,19 @@ class ZPR_plotter(object):
                             _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
     
                     if only:
-                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,0], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,0], marker='o', linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
                     else:
-                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T,0], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T,0], marker='o', linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
         #                self.set_legend_gap(_arr[0][0])
-                        _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,0], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                        _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T,0], marker='o', linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
                 #        _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='o', color='black', label='interpolated')
     
                     # extrapolated data
                     if only:
-                        _arr[0,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[0,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
                     else:
-                        _arr[0,0].plot(self.extr_pressure1[:-2], self.extr_full_gap_ren1[:-2,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
-                        _arr[1,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[0,0].plot(self.extr_pressure1[:-2], self.extr_full_gap_ren1[:-2,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
 
 
     ##-------------------------------------- passed TPT
@@ -6211,21 +6252,21 @@ class ZPR_plotter(object):
 #
                             if crit_index2 is not None:
                                 if only:
-                                    _arr[0][0].plot(self.explicit_pressures[crit_index2+2,:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='Static T=0')
+                                    _arr[0][0].plot(self.explicit_pressures[crit_index2+2,:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='Static T=0',linewidth=1.5)
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+2:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='Static T=0')
+                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+2:], self.explicit_gap_energies[crit_index2+2:],marker='d', color='black', label='Static T=0',linewidth=1.5)
 
                     if only:
-                        _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,0], marker='o', linewidth=2.0, color=self.color[T])
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,0], marker='o', linewidth=3.0, color=self.color[T])
                     else:
-                        _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,0], marker='o', linewidth=2.0, color=self.color[T])
-                        _arr[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,0], marker='o', linewidth=2.0, color=self.color[T])
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,0], marker='o', linewidth=3.0, color=self.color[T])
+                        _arr[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T,0], marker='o', linewidth=3.0, color=self.color[T])
 
                     if only:
-                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
                     else:
-                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
-                        _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
 
 
                     if self.gap_fname is not None:
@@ -6298,45 +6339,45 @@ class ZPR_plotter(object):
 #                            _arr[1][0].plot(self.explicit_pressures[0:s], self.explicit_gap_energies[0:s],marker='d', color='black', label='Static T=0')
                             if crit_index2 is not None:
                                 if only:
-                                     _arr[0][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=8, color='black', label='Static T=0')
+                                     _arr[0][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=8, color='black', label='Static T=0',linewidth=1.5)
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=8, color='black', label='Static T=0')
+                                    _arr[1][0].plot(self.explicit_pressures[:crit_index2+1], self.explicit_gap_energies[:crit_index2+1],marker='d',markersize=8, color='black', label='Static T=0',linewidth=1.5)
                             else:
                                 if only:
-                                     _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', markersize=8,color='black', label='Static T=0')
+                                     _arr[0][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d', markersize=8,color='black', label='Static T=0',linewidth=1.5)
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d',markersize=8, color='black', label='Static T=0')
+                                    _arr[1][0].plot(self.explicit_pressures[:], self.explicit_gap_energies[:],marker='d',markersize=8, color='black', label='Static T=0',linewidth=1.5)
 
                         else:
                             if only:
-                                _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black', label='Static T=0')
+                                _arr[0][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black', label='Static T=0',linewidth=1.5)
                             else:
-                                _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black', label='Static T=0')
+                                _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='d', color='black', label='Static T=0',linewidth=1.5)
 #                    else:
 #                        _arr[1][0].plot(self.pressure[0:s], self.full_energy0[0:s,0],marker='o', color='black')
     
                     if only:
-                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=10, linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
                     else:
-                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d',markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                        _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d',markersize=10, linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
         #                self.set_legend_gap(_arr[0][0])
-                        _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=8, linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                        _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='d',markersize=10, linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
                 #        _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='o', color='black', label='interpolated')
 
     #                if only:
-    #                    _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+    #                    _arr[0][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='o', linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
     #                else:
-    #                    _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+    #                    _arr[0][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='o', linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
     #    #                self.set_legend_gap(_arr[0][0])
-    #                    _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='o', linewidth=2.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+    #                    _arr[1][0].plot(self.pressure[0:s], self.full_gap_energy[0:s,T], marker='o', linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
     #            #        _arr2[0][0].plot(self.pressure[0:s], self.full_energy0[0:s],marker='o', color='black', label='interpolated')
     
                     # extrapolated data
                     if only:
-                        _arr[0,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[0,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
                     else:
-                        _arr[0,0].plot(self.extr_pressure1[:-2], self.extr_full_gap_ren1[:-2,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
-                        _arr[1,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[0,0].plot(self.extr_pressure1[:-2], self.extr_full_gap_ren1[:-2,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure1, self.extr_full_gap_energy1[:,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
 
 
     ##-------------------------------------- passed TPT
@@ -6358,20 +6399,20 @@ class ZPR_plotter(object):
 #
                             if crit_index2 is not None:
                                 if only:
-                                     _arr[0][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=8, color='black', label=None)
+                                     _arr[0][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=8, color='black', label=None,linewidth=1.5)
                                 else:
-                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=8, color='black', label=None)
+                                    _arr[1][0].plot(self.explicit_pressures[crit_index2+1:], self.explicit_gap_energies[crit_index2+1:],marker='o',markersize=8, color='black', label=None,linewidth=1.5)
 
                     if only:
-                        _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=8, linewidth=2.0, color=self.color[T])
-                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=10, linewidth=3.0, color=self.color[T])
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
 
                     else:
-                        _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o',markersize=8, linewidth=2.0, color=self.color[T])
-                        _arr[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=8, linewidth=2.0, color=self.color[T])
+                        _arr[0][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o',markersize=10, linewidth=3.0, color=self.color[T])
+                        _arr[1][0].plot(self.pressure[s:], self.full_gap_energy[s:,T], marker='o',markersize=10, linewidth=3.0, color=self.color[T])
 
-                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
-                        _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=2.0, label = None, color = self.color[T])
+                        _arr[0,0].plot(self.extr_pressure2, self.extr_full_gap_ren2[:,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
+                        _arr[1,0].plot(self.extr_pressure2, self.extr_full_gap_energy2[:,T], linestyle='--', linewidth=3.0, label = None, color = self.color[T])
 
 
                     if self.gap_fname is not None:
@@ -6545,9 +6586,9 @@ class ZPR_plotter(object):
             _arr[0][0].text(1.44,190,r'WSM',fontsize=26,color='#5A5A5A',weight='bold')
 
             legend_handles = []
-            legend_handles.append(Line2D([0],[0],color='k',linewidth=2.5,label=r'Static'))
+            legend_handles.append(Line2D([0],[0],color='k',linewidth=5.0,label=r'Static'))
             for t,T in enumerate(self.ref_temp):
-                legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=2.5,label=r'{:>3.0f} K'.format(T)))
+                legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=5.0,label=r'{:>3.0f} K'.format(T)))
 
             legend1 = _arr[0][0].legend(handles=legend_handles, loc=9, bbox_to_anchor=(0.5,1.16),fontsize=24,handletextpad=0.4,handlelength=1.0,frameon=True,ncol=len(self.ref_temp)+1,columnspacing=0.7)
             _arr[0][0].add_artist(legend1)
@@ -8113,6 +8154,28 @@ class ZPR_plotter(object):
             g2.savefig('figures/{}_Fan-DW.png'.format(self.savefile))
             g3.savefig('figures/{}_occ-unocc.png'.format(self.savefile))
 
+    def set_colors_from_colormap(self, mycmap):
+
+        # set the color array using a cmap
+
+        cmap = plt.get_cmap(mycmap)
+#        cmap = self.truncate_colormap(cmap, minval=0.0, maxval=0.92,n=100)
+        cmap = self.truncate_colormap(cmap, minval=0.0, maxval=0.97,n=100)
+
+        color_idx = np.linspace(0, 1.0, self.ntemp)
+        colors = []
+        for i in range(self.ntemp):
+            colors.append(cmap(color_idx[i]))
+
+        return colors
+
+    def truncate_colormap(self, cmap, minval=0.0, maxval=1.0, n=100):
+
+        # truncate a given colormap
+        new_cmap = mcolors.LinearSegmentedColormap.from_list('trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),cmap(np.linspace(minval, maxval, n)))
+
+        return new_cmap
+
     
 ##########################
 # Create a directory if it does not exist
@@ -8156,6 +8219,7 @@ def plotter(
         # Options
         figsize = (15,9),
         color = None,
+        color_from_cmap = None,
         labels = None,
         linestyle = None,
         ylims = None,
@@ -8211,7 +8275,7 @@ def plotter(
         spline_factor = 5,
         extrapolate_ren = False,
         read_correction_from_spline = False,
-        cmap_cols = None,
+        cmap_cols = None, # rename this, it is for the PT diagram only
         crossover = False,
         diagram_together = False,
         save_format = 'png',
@@ -8237,6 +8301,7 @@ def plotter(
             units = units,
 
             color = color,
+            color_from_cmap = color_from_cmap,
             labels = labels,
             linestyle = linestyle,
             fermi = fermi,
