@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 from matplotlib.ticker import FuncFormatter
 from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, FancyArrow
 from matplotlib import cm
 import matplotlib.colors as mcolors
 
@@ -288,10 +288,10 @@ class ZPRfile(CDFfile):
             self.indirect_gap_energy_band_split = ncdata.variables['indirect_gap_energy_band_split'][:,:,:]
             self.indirect_gap_ren_band_split = ncdata.variables['indirect_gap_renormalization_band_split'][:,:,:]
 
-            self.fan_occ = ncdata.variables['reduced_fan_occ'][:,:,:,:]
-            self.fan_unocc = ncdata.variables['reduced_fan_unocc'][:,:,:,:]
-            self.ddw_occ = ncdata.variables['reduced_ddw_occ'][:,:,:,:]
-            self.ddw_unocc = ncdata.variables['reduced_ddw_unocc'][:,:,:,:]
+#            self.fan_occ = ncdata.variables['reduced_fan_occ'][:,:,:,:]
+#            self.fan_unocc = ncdata.variables['reduced_fan_unocc'][:,:,:,:]
+#            self.ddw_occ = ncdata.variables['reduced_ddw_occ'][:,:,:,:]
+#            self.ddw_unocc = ncdata.variables['reduced_ddw_unocc'][:,:,:,:]
 
             status = ncdata.get_variables_by_attributes(name='corrected_eigenvalue_spline_interpolation')
             if status != []:
@@ -1214,6 +1214,7 @@ class ZPR_plotter(object):
 
         file_qty = len(self.zpr_fnames)
 
+        print('Plotting gap_separate')
         # Define figure
         fig, _arr = plt.subplots(3,1, figsize=self.figsize, sharex=True, squeeze=False)
 
@@ -1240,6 +1241,8 @@ class ZPR_plotter(object):
             self.ntemp = self.zpr.ntemp
             self.temp = self.zpr.temp
             self.kpoints = self.zpr.kpoints
+
+            self.marker = ['o','s','d','^','X','*','h','d','P','|','1']
 
             if self.verbose:
                 if ifile == 0:
@@ -1277,42 +1280,42 @@ class ZPR_plotter(object):
             if self.split:
                 if self.linestyle[ifile] == 'dashed':
                     #conduction band
-                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
-                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
                     #Valence band
-                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
-                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
                     #Gap correction
-                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
-                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
                 elif self.linestyle[ifile] == 'dotted':
                     #conduction band
-                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
-                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
                     #Valence band
-                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
-                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
                     #Gap correction
-                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
-                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
                 else:
                     #conduction band
-                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
                     #Valence band
-                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
                     #Gap correction
-                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
 
 
 
 
             else:
-                _arr[0][0].plot(self.temp, self.band_ren[:,1], marker='o', markersize=8, linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                _arr[1][0].plot(self.temp, self.band_ren[:,0], marker='o', markersize=8,linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                _arr[2][0].plot(self.temp, self.gap_ren, marker='o', markersize=8,linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                _arr[0][0].plot(self.temp, self.band_ren[:,1], marker=self.marker[ifile], markersize=12, linewidth=3.0, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                _arr[1][0].plot(self.temp, self.band_ren[:,0], marker=self.marker[ifile], markersize=12,linewidth=3.0, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                _arr[2][0].plot(self.temp, self.gap_ren, marker=self.marker[ifile], markersize=12,linewidth=3.0, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
 
             if self.verbose:
                 side = 0 # 0 = HA, 1 = AL
@@ -1400,12 +1403,16 @@ class ZPR_plotter(object):
 
         else:
             if self.main_title:
-                self.set_title(_arr0[0][0], self.main_title)
+                self.set_title(_arr[0][0], self.main_title)
 
-        legend1 = _arr[0][0].legend(loc=9,bbox_to_anchor=(0.5,1.28),fontsize=24, handletextpad=0.4,handlelength=1.0,frameon=True,ncol = file_qty,columnspacing=0.7)
+        if file_qty < 7:
+            ncol = file_qty
+        else:
+            ncol = 6
+        legend1 = _arr[0][0].legend(loc=9,bbox_to_anchor=(0.5,1.50),fontsize=24, handletextpad=0.4,handlelength=1.0,frameon=True,ncol = ncol,columnspacing=0.7)
         _arr[0][0].add_artist(legend1)
         
-        fig.subplots_adjust(hspace=0.0,top=0.91,right=0.90,bottom=0.10,left=0.12)
+        fig.subplots_adjust(hspace=0.0,top=0.85,right=0.90,bottom=0.10,left=0.12)
 
         if self.split:
             fig.align_ylabels()
@@ -3650,6 +3657,15 @@ class ZPR_plotter(object):
         _arr[2][0].text(1.85,-60,r'$\Rightarrow$',fontsize=26,color='#5A5A5A')
         _arr[2][0].text(1.35,-60,r'WSM',fontsize=26,color='#5A5A5A',weight='bold')
 
+        #Add arrows to indicate increasing T
+        _arr[0,0].annotate('',xy=(2.85,-25), xytext=(2.85,-1),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+        _arr[0,0].annotate('Increasing T',xy=(2.9,-20), xytext=(2.32,-34),fontsize=24)
+        _arr[0,0].annotate('',xy=(1.65,31), xytext=(1.65,1),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+        _arr[1,0].annotate('',xy=(1.65,16), xytext=(1.65,1),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+        _arr[1,0].annotate('',xy=(2.85,33), xytext=(2.85,2),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+        _arr[2,0].annotate('',xy=(1.65,17), xytext=(1.65,1),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+        _arr[2,0].annotate('',xy=(2.85,-60), xytext=(2.85,-2),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+
         legend_handles = [] 
         for t, temp in enumerate(self.ref_temp):
 #            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=5.0, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
@@ -4344,15 +4360,15 @@ class ZPR_plotter(object):
                     _arr2[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
 
                 else:
-                    _arr[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=r'{} K'.format(self.ref_temp[T]))
-                    _arr[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
-                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d', markersize=8, linewidth=1.5, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[0][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,1], marker='d', markersize=8, linewidth=3.0, color=self.color[T], label=r'{} K'.format(self.ref_temp[T]))
+                    _arr[1][0].plot(self.pressure[0:s], self.full_band_ren[0:s,T,0], marker='d', markersize=8, linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
+                    _arr[2][0].plot(self.pressure[0:s], self.full_gap_ren[0:s,T], marker='d', markersize=8, linewidth=3.0, color=self.color[T], label=str(self.ref_temp[T])+' K')
 
                   #  _arr[2][0].legend(numpoints=1, loc= 'center right', bbox_to_anchor=(1.27,1.62), ncol=1, fontsize=20)
 
-                    _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
-                    _arr[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
-                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=8, linewidth=1.5, color=self.color[T])
+                    _arr[0][0].plot(self.pressure[s:], self.full_band_ren[s:,T,1], marker='o', markersize=8, linewidth=3.0, color=self.color[T])
+                    _arr[1][0].plot(self.pressure[s:], self.full_band_ren[s:,T,0], marker='o', markersize=8, linewidth=3.0, color=self.color[T])
+                    _arr[2][0].plot(self.pressure[s:], self.full_gap_ren[s:,T], marker='o', markersize=8, linewidth=3.0, color=self.color[T])
 
 
             else:
@@ -4412,6 +4428,16 @@ class ZPR_plotter(object):
         _arr[2][0].text(1.85,-25,r'$\Rightarrow$',fontsize=26,color='#5A5A5A')
         _arr[2][0].text(1.35,-25,r'WSM',fontsize=26,color='#5A5A5A',weight='bold')
 
+        #Add arrows for increasing T
+        _arr[0,0].annotate('',xy=(2.85,-230), xytext=(2.85,-5),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+        _arr[0,0].annotate('Increasing T',xy=(2.9,-20), xytext=(2.32,-258),fontsize=24)
+        _arr[0,0].annotate('',xy=(1.65,-285), xytext=(1.65,-5),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+        _arr[1,0].annotate('',xy=(1.65,-295), xytext=(1.65,-5),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+        _arr[1,0].annotate('',xy=(2.85,-185), xytext=(2.85,-5),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+        _arr[2,0].annotate('',xy=(1.65,16), xytext=(1.65,1),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+        _arr[2,0].annotate('',xy=(2.85,-49), xytext=(2.85,-1),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+
+
 #        if self.main_title:
 #            self.set_title(_arr[0][0], self.main_title)
 
@@ -4445,7 +4471,7 @@ class ZPR_plotter(object):
 #
         legend_handles = [] 
         for t, temp in enumerate(self.ref_temp):
-            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=2.5, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
+            legend_handles.append(Line2D([0],[0],color=self.color[t],linewidth=5.0, label=r'{:>3.0f} K'.format(self.ref_temp[t])))
 #                Line2D([0],[0],color='b',marker='o',markersize=8,linestyle='None',label=r'P$_{\text{C2}}$ plane')]
         #legend_handles.append('')
         #legend_handles.append('')
@@ -6181,8 +6207,8 @@ class ZPR_plotter(object):
 ######################################
         ## Start plotting here ###
         
-        lstyle = ['solid',(0,(3,1,1,1,1,1)),(0,(1,1)),(0,(3,1,1,1)),(0,(3,1)),'solid']
-#        lstyle = ['solid','solid','solid','solid','solid','solid']
+#        lstyle = ['solid',(0,(3,1,1,1,1,1)),(0,(1,1)),(0,(3,1,1,1)),(0,(3,1)),'solid']
+        lstyle = ['solid','solid','solid','solid','solid','solid']
 
         for T in range(self.ntemp):
             if crit_index is not None:
@@ -6452,19 +6478,21 @@ class ZPR_plotter(object):
 
         if only:
             self.set_vrefs(_arr[0][0], self.pressure, 0.)
-            self.set_hrefs(self.ylims, _arr[0][0], self.crit_pressure,'black')
+            if not self.crit_pressure2:
+                self.set_hrefs(self.gap_ylims, _arr[0][0], self.crit_pressure,'black')
             if self.split:
                 self.set_vrefs(_arr2[0][0], self.pressure, 0.)
-                self.set_hrefs(self.ylims, _arr2[0][0], self.crit_pressure,'black')
+                if not self.crit_pressure2:
+                    self.set_hrefs(self.gap_ylims, _arr2[0][0], self.crit_pressure,'black')
 
         else:
             for i in range(2):
         #            if i==0 :
                     self.set_vrefs(_arr[i][0], self.pressure, 0.)
-                    self.set_hrefs(self.ylims, _arr[i][0], self.crit_pressure,'black')
+                    self.set_hrefs(self.gap_ylims, _arr[i][0], self.crit_pressure,'black')
                     if self.split:
                         self.set_vrefs(_arr2[i][0], self.pressure, 0.)
-                        self.set_hrefs(self.ylims, _arr2[i][0], self.crit_pressure,'black')
+                        self.set_hrefs(self.gap_ylims, _arr2[i][0], self.crit_pressure,'black')
 
         limms = [[-80.,60.],[0.,350]]
 #        limms = [[-60.,60.],[0.,80.],[-80.,40.]]
@@ -6485,6 +6513,7 @@ class ZPR_plotter(object):
                 if self.crit_pressure2:
                     pc2 = self.crit_pressure2
                     self.set_hrefs(ylims, _arr[0][0], pc2,'gray')
+
                     _arr[0][0].fill([pc1,pc2,pc2,pc1],[ylims[0],ylims[0],ylims[1],ylims[1]],'gray',alpha=0.2,zorder=-1, rasterized=True)
                 else:
                     print('No value was given for PC2')
@@ -6584,6 +6613,16 @@ class ZPR_plotter(object):
             _arr[0][0].text(1.90,200,r'$\Rightarrow$',fontsize=26,color='#5A5A5A')
             _arr[0][0].text(1.44,210,r'Static',fontsize=26,color='#5A5A5A',weight='bold')
             _arr[0][0].text(1.44,190,r'WSM',fontsize=26,color='#5A5A5A',weight='bold')
+
+            #Add arrows for increasing T
+            _arr[0,0].annotate('',xy=(0.00,250), xytext=(0.00,280),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+            _arr[0,0].annotate('',xy=(0.50,105), xytext=(0.50,170),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+            _arr[0,0].annotate('',xy=(1.00,158), xytext=(1.00,135),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+            _arr[0,0].annotate('',xy=(1.50,130), xytext=(1.50,80),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+            _arr[0,0].annotate('',xy=(5.10,50), xytext=(5.10,165),arrowprops=dict(color='k',headlength=12,headwidth=8,width=1.0))
+            _arr[0,0].annotate('Increasing T',xy=(1.2,120), xytext=(1.07,137),fontsize=24)
+
+            _arr[0,0].set_xlim(-0.1,5.2)
 
             legend_handles = []
             legend_handles.append(Line2D([0],[0],color='k',linewidth=5.0,label=r'Static'))
@@ -7193,24 +7232,45 @@ class ZPR_plotter(object):
 
 #            cmap = mcolors.LinearSegmentedColormap.from_list("", ["cornsilk","palegreen","mediumorchid"])
             if self.cmap_cols:
+                print(self.cmap_cols)
                 cmap = mcolors.LinearSegmentedColormap.from_list("", self.cmap_cols)
             else:
-                cmap = 'Blues'
+                mycmap = plt.get_cmap('plasma_r') #'Blues'
+                n = 3
+                minval = 0.0
+                maxval = 1.0
+                cmap = mcolors.LinearSegmentedColormap.from_list('trunc({n},{a:.2f},{b:.2f})'.format(n=mycmap.name, a=minval, b=maxval),mycmap(np.linspace(minval, maxval, n)))
+
 
             _arr.imshow(self.phase, extent = [self.pressure[0],self.pressure[-1], self.temp[0], self.temp[-1]], origin='lower', 
                     aspect = 0.65*self.pressure[-1]/self.temp[-1],interpolation='bicubic', vmin=0, vmax=2,cmap=cmap,zorder=1, rasterized=False)            
                                                                     # spline16, bilinear, bicubic
 
-            legend_handles = [Line2D([0],[0],color=self.cmap_cols[0],linestyle='None',marker='s',markersize=20, label=r'$\mathbb{Z}_2=0$',markeredgecolor='k'),
-                                Line2D([0],[0],color=self.cmap_cols[1],linestyle='None',marker='s',markersize=20, label=r'WSM',markeredgecolor='k'),
-                                Line2D([0],[0],color=self.cmap_cols[2],linestyle='None',marker='s',markersize=20, label=r'$\mathbb{Z}_2=1$',markeredgecolor='k'),
-                                Line2D([0],[0],color='k',linestyle='dotted',linewidth=2.5, dashes=(2,4),label=r'Static'),
-                                Line2D([0],[0],color='k', linestyle='solid',linewidth=2.5, label=r'P$_{\text{C}1}$,P$_{\text{C2}}$'),
-]
+            if self.cmap_cols:
+                legend_handles = [
+                        #Line2D([0],[0],color=self.cmap_cols[0],linestyle='None',marker='s',markersize=20, label=r'$\mathbb{Z}_2=0$',markeredgecolor='k'),
+                         #           Line2D([0],[0],color=self.cmap_cols[1],linestyle='None',marker='s',markersize=20, label=r'WSM',markeredgecolor='k'),
+                          #          Line2D([0],[0],color=self.cmap_cols[2],linestyle='None',marker='s',markersize=20, label=r'$\mathbb{Z}_2=1$',markeredgecolor='k'),
+                                    Line2D([0],[0],color='k',linestyle='dotted',linewidth=3.0, dashes=(2,2),label=r'Static'),
+                                    Line2D([0],[0],color='k', linestyle='solid',linewidth=3.0, marker='o',markersize=12,label=r'P$_{\text{C}1}$,P$_{\text{C2}}$'),]
+            else:
+                legend_handles = [Line2D([0],[0],color=cmap(0),linestyle='None',marker='s',markersize=20, label=r'$\mathbb{Z}_2=0$',markeredgecolor='k'),
+                                    Line2D([0],[0],color=cmap(0.5),linestyle='None',marker='s',markersize=20, label=r'WSM',markeredgecolor='k'),
+                                    Line2D([0],[0],color=cmap(1),linestyle='None',marker='s',markersize=20, label=r'$\mathbb{Z}_2=1$',markeredgecolor='k'),
+                                    Line2D([0],[0],color='k',linestyle='dotted',linewidth=3.0, dashes=(2,4),label=r'Static'),
+                                    Line2D([0],[0],color='k', linestyle='solid',linewidth=3.0, marker='o',label=r'P$_{\text{C}1}$,P$_{\text{C2}}$'),]
 
-            legend2 = _arr.legend(handles = legend_handles, loc=9, bbox_to_anchor = (0.5,1.16), ncol = len(legend_handles),
-                            fontsize=24,handletextpad=0.4,frameon=True,handlelength=1.4,columnspacing=1.0)
-            _arr.add_artist(legend2)
+#            legend2 = _arr.legend(handles = legend_handles, loc=9, bbox_to_anchor = (0.5,1.16), ncol = len(legend_handles),
+#                            fontsize=24,handletextpad=0.4,frameon=True,handlelength=1.4,columnspacing=1.0)
+            #legend2 = _arr.legend(handles = legend_handles, loc=9, bbox_to_anchor = (0.5,1.16), ncol = len(legend_handles),
+            #                fontsize=24,handletextpad=0.6,frameon=True,handlelength=2.2,columnspacing=1.5)
+
+            #_arr.add_artist(legend2)
+
+            _arr.text(0.6,400,r'$\mathbb{Z}_2=0$',fontsize=32)
+            _arr.text(4.2,400,r'$\mathbb{Z}_2=1$',fontsize=32)
+            _arr.text(2.55,400,r'WSM',fontsize=32)
+
 
 
         #_arr.text(0.5,400,r'T crossover',fontsize=24,zorder=10)
@@ -7874,6 +7934,7 @@ class ZPR_plotter(object):
             lims = (-5, 1.01*max(self.temp))
             f.set_xlim(lims)
             f.set_xlabel('Temperature (K)', fontsize=32)
+            f.xaxis.set_major_formatter(FuncFormatter(self.label_formatter))
             plt.setp(f.get_xticklabels(), fontsize=26, weight='bold')
 #            f.xaxis.set_tick_params(labelsize=16)
 #            if not self.xlims:
