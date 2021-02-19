@@ -136,10 +136,12 @@ class EPCfile(CDFfile):
             self.temp = ncdata.variables['temperatures'][:]
             self.td_ren = ncdata.variables['temperature_dependent_renormalization'][:,:,:,:]
         # ONLY IF RAN WITH MY DEVELOP BRANCH
-        #    self.fan_occ = ncdata.variables['temperature_dependent_renormalization_fan_occ'][:,:,:,:]
-        #    self.fan_unocc = ncdata.variables['temperature_dependent_renormalization_fan_unocc'][:,:,:,:]
-        #    self.ddw_occ = ncdata.variables['temperature_dependent_renormalization_ddw_occ'][:,:,:,:]
-        #    self.ddw_unocc = ncdata.variables['temperature_dependent_renormalization_ddw_unocc'][:,:,:,:]
+            self.fan_occ = ncdata.variables['temperature_dependent_renormalization_fan_occ'][:,:,:,:]
+            self.fan_unocc = ncdata.variables['temperature_dependent_renormalization_fan_unocc'][:,:,:,:]
+            self.ddw_occ = ncdata.variables['temperature_dependent_renormalization_ddw_occ'][:,:,:,:]
+            self.ddw_unocc = ncdata.variables['temperature_dependent_renormalization_ddw_unocc'][:,:,:,:]
+            self.sternheimer = ncdata.variables['temperature_dependent_renormalization_sternheimer'][:,:,:,:]
+            self.active = ncdata.variables['temperature_dependent_renormalization_active'][:,:,:,:]
 
             self.zp_ren = ncdata.variables['zero_point_renormalization'][:,:,:]
             self.zp_ren_modes = ncdata.variables['zero_point_renormalization_by_modes'][:,:,:,:]
@@ -274,6 +276,7 @@ class EigenvalueCorrections(object):
                 modes = False,
                 split_contribution = False,
                 split_occupied_subspace = False,
+                split_stern_active = False,
                 spline = False,
                 spline_factor = 5,
 
@@ -346,6 +349,7 @@ class EigenvalueCorrections(object):
         self.full_contribution = full_contribution
         self.split_contribution = split_contribution
         self.split_occupied_subspace = split_occupied_subspace
+        self.split_stern_active = split_stern_active
         self.gap_ren = gap_ren
         self.units = units
         self.temperature = temperature
@@ -448,6 +452,10 @@ class EigenvalueCorrections(object):
             self.ddw_occ = self.epc.ddw_occ
             self.ddw_unocc = self.epc.ddw_unocc
 
+        if self.split_stern_active:
+            self.sternheimer = self.epc.sternheimer
+            self.active = self.epc.active
+
         # Average on symmetry-equivalent kpoints
         if self.reduce_path :
             self.reduced_nkpt, self.reduced_kpts_index, self.reduced_kpath = self.reduce_symmetry_equivalent(self.kpoints)
@@ -539,6 +547,11 @@ class EigenvalueCorrections(object):
                self.reduced_fan_unocc = self.average_kpts(self.reduced_kpts_index, self.fan_unocc, self.ntemp) 
                self.reduced_ddw_occ = self.average_kpts(self.reduced_kpts_index, self.ddw_occ, self.ntemp) 
                self.reduced_ddw_unocc = self.average_kpts(self.reduced_kpts_index, self.ddw_unocc, self.ntemp) 
+
+            if self.split_stern_active:
+                self.reduced_sternheimer = self.average_kpts(self.reduced_kpts_index, self.sternheimer, self.ntemp)
+                self.reduced_active = self.average_kpts(self.reduced_kpts_index, self.active, self.ntemp)
+
 
 
 
@@ -1802,6 +1815,18 @@ class EigenvalueCorrections(object):
             if self.reduce_path and self.split_occupied_subspace:
                 data[:,:,:,:] = self.reduced_ddw_unocc[:,:,:,:]
             
+            # Split Sternheimer and active contributions
+            data = dts.createVariable('reduced_sternheimer','d', ('number_of_spins','number_of_reduced_kpoints','number_of_bands','number_of_temperatures'))
+            data.units = "Hartree"
+            if self.reduce_path and self.split_stern_active:
+                data[:,:,:,:] = self.reduced_sternheimer[:,:,:,:]
+
+            data = dts.createVariable('reduced_active','d', ('number_of_spins','number_of_reduced_kpoints','number_of_bands','number_of_temperatures'))
+            data.units = "Hartree"
+            if self.reduce_path and self.split_stern_active:
+                data[:,:,:,:] = self.reduced_active[:,:,:,:]
+
+
         return
 
     def write_gap_info(self):
@@ -1883,6 +1908,7 @@ def compute(
         modes=False,
         split_contribution = False,
         split_occupied_subspace = False,
+        split_stern_active = False,
         spline = False,
         spline_factor = 5,
 
@@ -1908,6 +1934,7 @@ def compute(
             full_contribution = full_contribution,
             split_contribution = split_contribution,
             split_occupied_subspace = split_occupied_subspace,
+            split_stern_active = split_stern_active,
 
             valence = valence,
             nsppol = nsppol,
