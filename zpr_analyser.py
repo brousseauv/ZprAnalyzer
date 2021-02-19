@@ -133,21 +133,22 @@ class EPCfile(CDFfile):
             self.natom = len(ncdata.dimensions['number_of_atoms'])
             self.eig0 = ncdata.variables['eigenvalues'][:,:,:]
             self.kpoints = ncdata.variables['reduced_coordinates_of_kpoints'][:,:]
+            self.qpoints = ncdata.variables['reduced_coordinates_of_qpoints'][:,:]
             self.temp = ncdata.variables['temperatures'][:]
             self.td_ren = ncdata.variables['temperature_dependent_renormalization'][:,:,:,:]
         # ONLY IF RAN WITH MY DEVELOP BRANCH
-            self.fan_occ = ncdata.variables['temperature_dependent_renormalization_fan_occ'][:,:,:,:]
-            self.fan_unocc = ncdata.variables['temperature_dependent_renormalization_fan_unocc'][:,:,:,:]
-            self.ddw_occ = ncdata.variables['temperature_dependent_renormalization_ddw_occ'][:,:,:,:]
-            self.ddw_unocc = ncdata.variables['temperature_dependent_renormalization_ddw_unocc'][:,:,:,:]
-            self.sternheimer = ncdata.variables['temperature_dependent_renormalization_sternheimer'][:,:,:,:]
-            self.active = ncdata.variables['temperature_dependent_renormalization_active'][:,:,:,:]
+#            self.fan_occ = ncdata.variables['temperature_dependent_renormalization_fan_occ'][:,:,:,:]
+#            self.fan_unocc = ncdata.variables['temperature_dependent_renormalization_fan_unocc'][:,:,:,:]
+#            self.ddw_occ = ncdata.variables['temperature_dependent_renormalization_ddw_occ'][:,:,:,:]
+#            self.ddw_unocc = ncdata.variables['temperature_dependent_renormalization_ddw_unocc'][:,:,:,:]
+#            self.sternheimer = ncdata.variables['temperature_dependent_renormalization_sternheimer'][:,:,:,:]
+#            self.active = ncdata.variables['temperature_dependent_renormalization_active'][:,:,:,:]
+            self.zpr_qpt = ncdata.variables['zero_point_renormalization_qpt'][:,:,:,:]
+            self.zpr_qpt_modes = ncdata.variables['zero_point_renormalization_by_modes_qpt'][:,:,:,:,:]
 
             self.zp_ren = ncdata.variables['zero_point_renormalization'][:,:,:]
             self.zp_ren_modes = ncdata.variables['zero_point_renormalization_by_modes'][:,:,:,:]
             self.nqpt = len(ncdata.dimensions['number_of_qpoints'])
-            #self.contr_qpt = ncdata.variables['qpt_contribution'][:,:,:,:,:]
-            #self.contr_qpt_modes = ncdata.variables['qpt_contribution_modes'][:,:,:,:,:]
             self.self_energy = ncdata.variables['self_energy'][:,:,:,:,:]
             self.broadening = ncdata.variables['zero_point_broadening'][:,:,:]
             self.spectral_function = ncdata.variables['spectral_function'][:,:,:,:]
@@ -376,6 +377,7 @@ class EigenvalueCorrections(object):
         self.nsppol = self.epc.nsppol
         self.eig0 = self.epc.eig0
         self.kpoints = self.epc.kpoints
+        self.qpoints = self.epc.qpoints
         self.natom = self.epc.natom
         self.nqpt = self.epc.nqpt
         self.temp = self.epc.temp
@@ -424,14 +426,14 @@ class EigenvalueCorrections(object):
         # Get contribution from each qpt and/or mode
         if self.contribution :
             if self.modes:
-                self.contr_qpt_modes = self.epc.contr_qpt_modes
-                self.contr_qpt_modes = np.einsum('ijklm -> iklmj',self.contr_qpt_modes) #(nsppol,nkpt,nband,nqpt,nmodes)
+                self.zpr_qpt_modes = self.epc.zpr_qpt_modes
+                self.zpr_qpt_modes = np.einsum('vsknq -> sknqv',self.zpr_qpt_modes) #(nsppol,nkpt,nband,nqpt,nmodes)
                 self.zp_ren_modes = self.epc.zp_ren_modes
-                self.zp_ren_modes = np.einsum('ijkl->jkli',self.zp_ren_modes) #(nsppol,nkpt,nband,nmodes)
+                self.zp_ren_modes = np.einsum('vskn->sknv',self.zp_ren_modes) #(nsppol,nkpt,nband,nmodes)
                 self.nmodes = self.epc.nmodes
 
             else:
-                self.contr_qpt = self.epc.contr_qpt
+                self.zpr_qpt = self.epc.zpr_qpt
         else:
             if self.modes:
                 self.zp_ren_modes = self.epc.zp_ren_modes
@@ -473,13 +475,12 @@ class EigenvalueCorrections(object):
                 if self.modes:
                     self.reduced_zp_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nmodes))
                     self.reduced_zp_ren_modes = self.average_kpts(self.reduced_kpts_index, self.zp_ren_modes, self.nmodes)
-                    self.reduced_contr_qpt_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nqpt, self.nmodes))
+                    self.reduced_zpr_qpt_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nqpt, self.nmodes))
                     for v in range(self.nmodes):
-                        self.reduced_contr_qpt_modes[:,:,:,:,v] = self.average_kpts(self.reduced_kpts_index, self.contr_qpt_modes[:,:,:,:,v], self.nqpt) 
+                        self.reduced_zpr_qpt_modes[:,:,:,:,v] = self.average_kpts(self.reduced_kpts_index, self.zpr_qpt_modes[:,:,:,:,v], self.nqpt) 
                 else:
-                    self.reduced_contr_qpt = np.zeros((self.nsppol,self.reduced_nkpt,self.max_band,self.nqpt,self.ntemp))
-                    for t in range(self.ntemp):
-                        self.reduced_contr_qpt[:,:,:,:,t] = self.average_kpts(self.reduced_kpts_index, self.contr_qpt[:,:,:,:,t], self.nqpt)
+                    self.reduced_zpr_qpt = np.zeros((self.nsppol,self.reduced_nkpt,self.max_band,self.nqpt))
+                    self.reduced_zpr_qpt[:,:,:,:] = self.average_kpts(self.reduced_kpts_index, self.zpr_qpt[:,:,:,:], self.nqpt)
             else:
                 if modes:
                     self.reduced_zp_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nmodes))
@@ -1476,6 +1477,9 @@ class EigenvalueCorrections(object):
             data = dts.createVariable('reduced_coordinates_of_kpoints', 'd', ('number_of_kpoints', 'cartesian'))
             data[:,:] = self.kpoints[:,:]
         
+            data = dts.createVariable('reduced_coordinates_of_qpoints', 'd', ('number_of_qpoints', 'cartesian'))
+            data[:,:] = self.qpoints[:,:]
+
             data = dts.createVariable('bare_eigenvalues', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands'))
             data.units = "Hartree"
             data[:,:,:] = self.eig0[:,:,:]
@@ -1515,12 +1519,12 @@ class EigenvalueCorrections(object):
 
 
             ## Qpoint contribution
-            data = dts.createVariable('qpt_contribution', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_qpoints','number_of_temperatures'))
+            data = dts.createVariable('qpt_contribution', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_qpoints'))
             if self.contribution and not self.modes:
-                data[:,:,:,:,:] = self.contr_qpt[:,:,:,:,:]
+                data[:,:,:,:] = self.zpr_qpt[:,:,:,:]
             data = dts.createVariable('qpt_contribution_modes', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_qpoints','number_of_modes'))
             if self.contribution and self.modes :
-                data[:,:,:,:,:] = self.contr_qpt_modes[:,:,:,:,:]
+                data[:,:,:,:,:] = self.zpr_qpt_modes[:,:,:,:,:]
 
 
             ## ZP Self-energy
@@ -1730,13 +1734,13 @@ class EigenvalueCorrections(object):
                 data[:,:,:,:] = self.reduced_eigcorr[:,:,:,:]
 
 
-            data = dts.createVariable('reduced_qpt_contribution', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands', 'number_of_qpoints','number_of_temperatures'))
+            data = dts.createVariable('reduced_zpr_qpt_contribution', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands', 'number_of_qpoints'))
             if self.contribution and not self.modes:
-                data[:,:,:,:,:] = self.reduced_contr_qpt[:,:,:,:,:]
+                data[:,:,:,:] = self.reduced_zpr_qpt[:,:,:,:]
 
             data = dts.createVariable('reduced_qpt_contribution_modes', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands', 'number_of_qpoints','number_of_modes'))
             if self.contribution and self.modes:
-                data[:,:,:,:,:] = self.reduced_contr_qpt_modes[:,:,:,:,:]
+                data[:,:,:,:,:] = self.reduced_zpr_qpt_modes[:,:,:,:,:]
 
             data = dts.createVariable('reduced_self_energy', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands', 'number_of_frequencies', 'cplex'))
             if self.senergy:
