@@ -162,6 +162,13 @@ class EPCfile(CDFfile):
 #            self.fan_occterm = ncdata.variables['fan_occterm'][:,:,:,:,:,:,:,:]
 #            self.ddw_tdep = ncdata.variables['ddw_tdep'][:,:,:]
 
+            self.zpr_qpath = ncdata.variables['zero_point_renormalization_on_qpath'][:,:,:,:,:]  # v,s,k,n,q
+            self.zpr_qpath_fan = ncdata.variables['zero_point_renormalization_on_qpath_fan'][:,:,:,:,:]  # v,s,k,n,q
+            self.zpr_qpath_ddw = ncdata.variables['zero_point_renormalization_on_qpath_ddw'][:,:,:,:,:]  # v,s,k,n,q
+            self.gkk2_qpath_fan = ncdata.variables['gkk2_on_qpath_fan'][:,:,:,:,:]  # v,s,k,n,q
+            self.gkk2_qpath_ddw = ncdata.variables['gkk2_on_qpath_ddw'][:,:,:,:,:]  # v,s,k,n,q
+
+
                
     @property
     def nsppol(self):
@@ -245,6 +252,7 @@ class EigenvalueCorrections(object):
     points_to_print = None
     reduce_path = False
     contribution = False
+    contribution_path = False
     full_contribution = False
     split_occupied_subspace = False
     gap_ren = False
@@ -266,6 +274,7 @@ class EigenvalueCorrections(object):
                 points_to_print = None,
                 reduce_path = False,
                 contribution = False,
+                contribution_path = False,
                 full_contribution = False,
                 gap_ren = False,
                 temperature = False,
@@ -347,6 +356,7 @@ class EigenvalueCorrections(object):
         self.bands_to_print = bands_to_print
         self.points_to_print = points_to_print
         self.contribution = contribution
+        self.contribution_path = contribution_path
         self.full_contribution = full_contribution
         self.split_contribution = split_contribution
         self.split_occupied_subspace = split_occupied_subspace
@@ -431,6 +441,8 @@ class EigenvalueCorrections(object):
                 self.zp_ren_modes = self.epc.zp_ren_modes
                 self.zp_ren_modes = np.einsum('vskn->sknv',self.zp_ren_modes) #(nsppol,nkpt,nband,nmodes)
                 self.nmodes = self.epc.nmodes
+                #print('before')
+                #print(np.einsum
 
             else:
                 self.zpr_qpt = self.epc.zpr_qpt
@@ -457,6 +469,20 @@ class EigenvalueCorrections(object):
         if self.split_stern_active:
             self.sternheimer = self.epc.sternheimer
             self.active = self.epc.active
+
+        if self.contribution_path :
+            self.zpr_qpath = self.epc.zpr_qpath
+            self.zpr_qpath = np.einsum('vsknq -> sknqv',self.zpr_qpath) #(nsppol,nkpt,nband,nqpt,nmodes)
+            self.zpr_qpath_fan = self.epc.zpr_qpath_fan
+            self.zpr_qpath_fan = np.einsum('vsknq -> sknqv',self.zpr_qpath_fan) #(nsppol,nkpt,nband,nqpt,nmodes)
+            self.zpr_qpath_ddw = self.epc.zpr_qpath_ddw
+            self.zpr_qpath_ddw = np.einsum('vsknq -> sknqv',self.zpr_qpath_ddw)
+            self.gkk2_qpath_fan = self.epc.gkk2_qpath_fan
+            self.gkk2_qpath_fan = np.einsum('vsknq -> sknqv',self.gkk2_qpath_fan)
+            self.gkk2_qpath_ddw = self.epc.gkk2_qpath_ddw
+            self.gkk2_qpath_ddw = np.einsum('vsknq -> sknqv',self.gkk2_qpath_ddw)
+            self.nmodes = self.epc.nmodes
+
 
         # Average on symmetry-equivalent kpoints
         if self.reduce_path :
@@ -537,6 +563,26 @@ class EigenvalueCorrections(object):
 #                            #print(self.contr_qpt[0,54+dd,27,q,0])
 #                    print(np.sum(self.reduced_contr_qpt[0,5,27+aa,:,-1]))
 #                    print(self.reduced_td_ren[0,5,27+aa,-1])
+
+            if self.contribution_path:
+                self.reduced_zpr_qpath = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nqpt, self.nmodes))
+                for v in range(self.nmodes):
+                    self.reduced_zpr_qpath[:,:,:,:,v] = self.average_kpts(self.reduced_kpts_index, self.zpr_qpath[:,:,:,:,v], self.nqpt) 
+                self.reduced_zpr_qpath_fan = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nqpt, self.nmodes))
+                for v in range(self.nmodes):
+                    self.reduced_zpr_qpath_fan[:,:,:,:,v] = self.average_kpts(self.reduced_kpts_index, self.zpr_qpath_fan[:,:,:,:,v], self.nqpt) 
+                self.reduced_zpr_qpath_ddw = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nqpt, self.nmodes))
+                for v in range(self.nmodes):
+                    self.reduced_zpr_qpath_ddw[:,:,:,:,v] = self.average_kpts(self.reduced_kpts_index, self.zpr_qpath_ddw[:,:,:,:,v], self.nqpt) 
+                self.reduced_gkk2_qpath_fan = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nqpt, self.nmodes))
+                for v in range(self.nmodes):
+                    self.reduced_gkk2_qpath_fan[:,:,:,:,v] = self.average_kpts(self.reduced_kpts_index, self.gkk2_qpath_fan[:,:,:,:,v], self.nqpt) 
+                self.reduced_gkk2_qpath_ddw = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nqpt, self.nmodes))
+                for v in range(self.nmodes):
+                    self.reduced_gkk2_qpath_ddw[:,:,:,:,v] = self.average_kpts(self.reduced_kpts_index, self.gkk2_qpath_ddw[:,:,:,:,v], self.nqpt) 
+
+
+
 
             if self.senergy:
                 self.reduced_self_energy= np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nfreq,2))
@@ -1830,6 +1876,57 @@ class EigenvalueCorrections(object):
             if self.reduce_path and self.split_stern_active:
                 data[:,:,:,:] = self.reduced_active[:,:,:,:]
 
+            # Contribution on qpath
+            data = dts.createVariable('zpr_qpath', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands','number_of_qpoints','number_of_modes'))
+            data.units = "Hartree"
+            if self.contribution_path:
+                data[:,:,:,:,:] = self.zpr_qpath[:,:,:,:,:]
+
+            data = dts.createVariable('zpr_qpath_fan', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands','number_of_qpoints','number_of_modes'))
+            data.units = "Hartree"
+            if self.contribution_path:
+                data[:,:,:,:,:] = self.zpr_qpath_fan[:,:,:,:,:]
+
+            data = dts.createVariable('zpr_qpath_ddw', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands','number_of_qpoints','number_of_modes'))
+            data.units = "Hartree"
+            if self.contribution_path:
+                data[:,:,:,:,:] = self.zpr_qpath_ddw[:,:,:,:,:]
+
+            data = dts.createVariable('gkk2_qpath_fan', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands','number_of_qpoints','number_of_modes'))
+            data.units = "Hartree"
+            if self.contribution_path:
+                data[:,:,:,:,:] = self.gkk2_qpath_fan[:,:,:,:,:]
+
+            data = dts.createVariable('gkk2_qpath_ddw', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands','number_of_qpoints','number_of_modes'))
+            data.units = "Hartree"
+            if self.contribution_path:
+                data[:,:,:,:,:] = self.gkk2_qpath_ddw[:,:,:,:,:]
+
+            data = dts.createVariable('reduced_zpr_qpath', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands','number_of_qpoints','number_of_modes'))
+            data.units = "Hartree"
+            if self.contribution_path:
+                data[:,:,:,:,:] = self.reduced_zpr_qpath[:,:,:,:,:]
+
+            data = dts.createVariable('reduced_zpr_qpath_fan', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands','number_of_qpoints','number_of_modes'))
+            data.units = "Hartree"
+            if self.contribution_path:
+                data[:,:,:,:,:] = self.reduced_zpr_qpath_fan[:,:,:,:,:]
+
+            data = dts.createVariable('reduced_zpr_qpath_ddw', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands','number_of_qpoints','number_of_modes'))
+            data.units = "Hartree"
+            if self.contribution_path:
+                data[:,:,:,:,:] = self.reduced_zpr_qpath_ddw[:,:,:,:,:]
+
+            data = dts.createVariable('reduced_gkk2_qpath_fan', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands','number_of_qpoints','number_of_modes'))
+            data.units = "Hartree"
+            if self.contribution_path:
+                data[:,:,:,:,:] = self.reduced_gkk2_qpath_fan[:,:,:,:,:]
+
+            data = dts.createVariable('reduced_gkk2_qpath_ddw', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands','number_of_qpoints','number_of_modes'))
+            data.units = "Hartree"
+            if self.contribution_path:
+                data[:,:,:,:,:] = self.reduced_gkk2_qpath_ddw[:,:,:,:,:]
+
 
         return
 
@@ -1903,6 +2000,7 @@ def compute(
         reduce_path = False,
         temperature = False,
         contribution = False,
+        contribution_path = False,
         full_contribution = False,
         gap_ren = False,
         senergy = False,
@@ -1928,6 +2026,7 @@ def compute(
             bands_to_print = bands_to_print,
             reduce_path = reduce_path,
             contribution = contribution,
+            contribution_path = contribution_path,
             gap_ren = gap_ren,
             temperature = temperature,
             senergy = senergy,
