@@ -1,6 +1,5 @@
 #! /usr/bin/env python
 import matplotlib
-matplotlib.use('TKAgg')
 from matplotlib import rc
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
@@ -17,6 +16,8 @@ import warnings
 import itertools as itt
 from copy import copy
 from scipy.interpolate import interp1d
+from colorpalettes import highcontrast
+matplotlib.use('TKAgg')
 ############################
 # this code plots the corrected bandstructure on a symmetrized kpath obtained with zpr_analyser.py
 
@@ -27,14 +28,14 @@ from scipy.interpolate import interp1d
 ###########################
 
 # Tex settings
-rc('text', usetex = True)
-#rc('font', family = 'serif',weight = 'bold')
-rc('font', family = 'sans-serif',weight = 'bold')
-#rc('font',family='sans-serif')
+rc('text', usetex=True)
+# rc('font', family = 'serif',weight = 'bold')
+rc('font', family='sans-serif', weight='bold')
+# rc('font',family='sans-serif')
 plt.rcParams['axes.unicode_minus'] = False
-params = {'text.latex.preamble' : [r'\usepackage{amsmath,amssymb}']}
-#r'\usepackage[utf8]{inputenc}',r'\DeclareUnicodeCharacter{2212}{$-$}',
-#r'\usepackage{cmbright}']}
+params = {'text.latex.preamble': [r'\usepackage{amsmath,amssymb}']}
+# r'\usepackage[utf8]{inputenc}',r'\DeclareUnicodeCharacter{2212}{$-$}',
+# r'\usepackage{cmbright}']}
 #         r'\renewcommand{\familydefault}{\sfdefault}']}
 plt.rcParams.update(params)
 
@@ -166,6 +167,8 @@ class TEfile(CDFfile):
             self.gap_energy = ncdata.variables['gap_energy'][:]
             self.gap_energy_units = ncdata.variables['gap_energy'].getncattr('units')
             self.gap_renormalization = ncdata.variables['direct_gap_te_renormalization'][:]
+            self.gap_ren_band = ncdata.variables['te_renorm_direct_band'][:,:]
+
 #            self.band_energy = ncdata.variables['band_energy'][:,:]
 #            self.band_renormalization = ncdata.variables['band_renormalization'][:,:]
 
@@ -431,6 +434,8 @@ class ZPR_plotter(object):
     senergy = False
     broad = False
     gap = False
+    te_gap = False
+    total_gap = False
     pgap = False
     te_pgap = False
     total_pgap = False
@@ -448,6 +453,7 @@ class ZPR_plotter(object):
     verbose = False
     zero_gap_value = None
     experimental_data = None
+    split_zpr_te = False
     expdata = None
     zero_gap_units = 'eV'
     extrapolate_ren = False
@@ -510,6 +516,8 @@ class ZPR_plotter(object):
             senergy = False,
             broad = False,
             gap = False,
+            te_gap = False,
+            total_gap = False,
             vbcb = False,
             pgap = False,
             te_pgap = False,
@@ -530,6 +538,7 @@ class ZPR_plotter(object):
             zero_gap_units = 'eV',
             extrapolate_ren = False,
             read_correction_from_spline = False,
+            split_zpr_te = False,
 
             # Parameters
             nsppol = None,
@@ -625,12 +634,15 @@ class ZPR_plotter(object):
         self.zero_gap_value = zero_gap_value 
         self.zero_gap_units = zero_gap_units
         self.experimental_data = experimental_data
+        self.split_zpr_te = split_zpr_te
 
         self.renormalization = renormalization
         self.spectral = spectral
         self.senergy = senergy
         self.broad = broad
         self.gap = gap
+        self.te_gap = te_gap
+        self.total_gap = total_gap
         self.vbcb = vbcb
         self.pgap = pgap
         self.te_pgap = te_pgap
@@ -660,7 +672,7 @@ class ZPR_plotter(object):
         
         # Checks that all required input is provided
         if not self.zpr_fnames:
-            if not self.te_pgap:
+            if not self.te_pgap and not self.te_gap:
                 raise Exception('Must provide files for zpr_fnames')
 
 
@@ -677,14 +689,14 @@ class ZPR_plotter(object):
         if self.units is not 'meV' and self.units is not 'eV':
             raise Exception('Units must be eV or meV')
 
-        if self.te_pgap:
+        if self.te_pgap or self.te_gap:
             if not self.te_fnames:
                 raise Exception('Must provide files for te_fnames')
 
 
     def read_file(self):
     
-        if self.te_pgap:
+        if self.te_pgap or self.te_gap:
             f = self.te
         else:
             f = self.zpr
@@ -1472,6 +1484,620 @@ class ZPR_plotter(object):
 
 #        plt.show()
  
+    def plot_te_gap(self):
+
+        file_qty = len(self.te_fnames)
+
+        # Define figure
+        fig, _arr = plt.subplots(1,1, figsize=self.figsize, squeeze=False)
+
+        if self.split:
+            fig2, _arr2 = plt.subplots(1,1, figsize=self.figsize, squeeze=False)
+
+        # Read and treat all input files
+        for ifile, te_file in enumerate(self.te_fnames):
+                
+            # Define file class
+            self.te = TEfile(te_file, read=False)
+
+            # Read input file
+            self.read_file()
+
+            # Set parameters for this file
+            self.nsppol = self.te.nsppol
+            self.nkpt = self.te.nkpt
+            self.max_band = self.te.max_band
+            self.ntemp = self.te.ntemp
+            self.temp = self.te.temp
+            self.kpoints = self.te.kpoints
+  
+            # Add indirect/direct gap information
+            if self.indirect:
+                if self.split:
+                    self.gap_ren = self.te.indirect_gap_ren_split
+                    self.gap_units = self.te.gap_energy_units
+
+                else:
+                    self.gap_ren = self.te.indirect_gap_ren
+                    self.gap_units = self.te.gap_energy_units
+
+            else:
+                if self.split:
+                    self.gap_ren = self.te.gap_renormalization_split
+                    self.gap_units = self.te.gap_energy_units
+
+                else:
+                    self.gap_ren = self.te.gap_renormalization
+                    self.gap_units = self.te.gap_energy_units
+
+
+            if self.split:
+                if self.expdata:
+                    raise Exception("Experimental data option not implemented for split yet")
+
+                else:
+                    _arr[0][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[0][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+
+            else:
+                if self.expdata:
+                    if self.gap_units == self.expdata.yaxis_units:
+                        # they are both the same, no need to convert
+                        if self.zero_gap_value:
+                            if self.zero_gap_units == self.gap_units:
+                                shift = self.zero_gap_value-self.gap_ren[0]
+                            else:
+                                if self.zero_gap_units == 'eV' and self.gap_units == 'meV':
+                                    shift = self.zero_gap_value*1E3-self.gap_ren[0]
+                                elif self.zero_gap_units == 'meV' and self.gap_units == 'eV':
+                                    shift = self.zero_gap_value*1E-3-self.gap_ren[0]
+                                else:
+                                    raise Exception('Please provide zero gap value in eV or meV')
+
+                        else:
+                            shift = 0.
+
+                        _arr[0][0].plot(self.temp, self.gap_ren+shift, marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                        _arr[0][0].plot(self.expdata.xaxis, self.expdata.yaxis, marker='s', linestyle='None',color='black')
+
+                    else:
+                        # the only case I write for now is meV to eV. Add Hartree to eV later??
+                        if self.gap_units == 'meV' and self.expdata.yaxis_units == 'eV':
+
+                            if self.expdata.xaxis_units != 'K':
+                                raise Exception('Temperature axis must be in Kelvin')
+
+                            if self.zero_gap_value:
+                                if self.zero_gap_units == 'eV':
+                                    shift = self.zero_gap_value-self.gap_ren[0]*1E-3
+                                elif self.zero_gap_units == 'meV':
+                                    shift = (self.zero_gap_value-self.gap_ren[0])*1E-3
+                                else:
+                                    raise Exception('Please provide zero gap value in eV or meV')
+                            else:
+                                shift = 0.
+
+                            _arr[0][0].plot(self.temp, self.gap_ren*1E-3+shift, marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                            _arr[0][0].plot(self.expdata.xaxis, self.expdata.yaxis, marker='s', linestyle='None',color='black')
+
+       
+                else:
+                    _arr[0][0].plot(self.temp, self.gap_ren, marker='o', linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+
+        self.set_xaxis(_arr[0][0], self.temp)
+#        self.set_vrefs(_arr[0][0], self.temp, 0.)
+        if self.expdata:
+            self.set_yaxis(_arr[0][0], 'Gap energy ({})'.format(self.expdata.yaxis_units))
+        else:
+            self.set_yaxis(_arr[0][0], 'Gap renormalization ({})'.format(self.gap_units))
+        self.set_legend_gap(_arr[0][0])
+        self.set_main_title(fig) 
+
+        if self.split:
+            self.set_xaxis(_arr2[0][0], self.temp)
+            self.set_vrefs(_arr2[0][0], self.temp, 0.)
+            self.set_yaxis(_arr2[0][0], 'Gap renormalization ({})'.format(self.gap_units))
+            self.set_legend_gap(_arr2[0][0])
+
+            self.set_title(_arr[0][0], self.title[0])
+            self.set_title(_arr2[0][0], self.title[1])
+
+            self.set_main_title(fig2)
+               
+
+        if self.split:
+            self.save_figure_split(fig,fig2)
+        else:
+            self.save_figure(fig)
+
+        plt.show()
+
+    def plot_te_gap_separate(self):
+
+        file_qty = len(self.te_fnames)
+
+        print('Plotting gap_separate')
+        # Define figure
+        fig, _arr = plt.subplots(3,1, figsize=self.figsize, sharex=True, squeeze=False)
+
+        if self.split:
+            fig2, _arr2 = plt.subplots(3,1, figsize=self.figsize, sharex=True, squeeze=False)
+
+        if self.verbose:
+            h = open('output/compared_renormalization_{}_lowt.dat'.format(self.main_title),'w')
+
+
+        # Read and treat all input files
+        for ifile, te_file in enumerate(self.te_fnames):
+                
+            # Define file class
+            self.te = TEfile(te_file, read=False)
+
+            # Read input file
+            self.read_file()
+
+            # Set parameters for this file
+            self.nsppol = self.te.nsppol
+            self.nkpt = self.te.nkpt
+            self.max_band = self.te.max_band
+            self.ntemp = self.te.ntemp
+            self.temp = self.te.temp
+            self.kpoints = self.te.kpoints
+
+            self.marker = ['o','s','d','^','X','*','h','d','P','|','1']
+
+            if self.verbose:
+                if ifile == 0:
+                    h.write('Conduction band, Valence band and Gap Renormalization ({}) for {}\n'.format(self.te.gap_energy_units,self.main_title))
+                    h.write('{:12s}'.format(''))
+                    for t in range(self.ntemp):
+                        h.write('   {:>5.0f}K  '.format(self.temp[t]))
+                h.write('\n{:15s}'.format(self.labels[ifile]))
+                
+            
+            # Add indirect/direct gap information
+            if self.indirect:
+                if self.split:
+                    self.band_ren = self.te.indirect_gap_ren_band_split
+                    self.gap_ren = self.te.indirect_gap_ren_split
+                    self.gap_units = self.te.gap_energy_units
+
+                else:
+                    self.band_ren = self.te.indirect_gap_ren_band
+                    self.gap_ren = self.te.indirect_gap_ren
+                    self.gap_units = self.te.gap_energy_units
+
+            else:
+                if self.split:
+                    self.band_ren = self.te.band_renormalization_split
+                    self.gap_ren = self.te.gap_renormalization_split
+                    self.gap_units = self.te.gap_energy_units
+
+                else:
+                    self.band_ren = self.te.gap_ren_band
+                    print(self.band_ren[0,:])
+                    self.gap_ren = self.te.gap_renormalization
+                    self.gap_units = self.te.gap_energy_units
+
+
+            if self.split:
+                if self.linestyle[ifile] == 'dashed':
+                    #conduction band
+                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    #Valence band
+                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    #Gap correction
+                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (4,4))
+                elif self.linestyle[ifile] == 'dotted':
+                    #conduction band
+                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    #Valence band
+                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    #Gap correction
+                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile], dashes = (2,2))
+                else:
+                    #conduction band
+                    _arr[0][0].plot(self.temp, self.band_ren[:,0,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[0][0].plot(self.temp, self.band_ren[:,1,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    #Valence band
+                    _arr[1][0].plot(self.temp, self.band_ren[:,0,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[1][0].plot(self.temp, self.band_ren[:,1,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    #Gap correction
+                    _arr[2][0].plot(self.temp, self.gap_ren[:,0], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[2][0].plot(self.temp, self.gap_ren[:,1], marker=self.marker[ifile], linewidth=1.5, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+
+
+
+
+            else:
+                _arr[0][0].plot(self.temp, self.band_ren[:,1], marker=self.marker[ifile], markersize=12, linewidth=3.0, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                _arr[1][0].plot(self.temp, self.band_ren[:,0], marker=self.marker[ifile], markersize=12,linewidth=3.0, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                _arr[2][0].plot(self.temp, self.gap_ren, marker=self.marker[ifile], markersize=12,linewidth=3.0, color=self.color[ifile], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+
+            if self.verbose:
+                side = 0 # 0 = HA, 1 = AL
+                if ifile == 1: #Reference file for error calculation 
+                    err = np.zeros((self.ntemp,3))
+                    refzpr = np.zeros((self.ntemp,3))
+                    refzpr[:,0] = self.band_ren[:,side,1] # left/right, val/cond
+                    refzpr[:,1] = self.band_ren[:,side,0]
+                    refzpr[:,2] = self.gap_ren[:,side]
+
+                if self.split:
+                    if ifile > 1:
+                        err[:,0] = (self.band_ren[:,side,1] - refzpr[:,0])/refzpr[:,0]*100
+                        err[:,1] = (self.band_ren[:,side,0] - refzpr[:,1])/refzpr[:,1]*100
+                        err[:,2] = (self.gap_ren[:,side] - refzpr[:,2])/refzpr[:,2]*100
+                        
+                    h.write('\n{:15s}'.format('  CB'))
+                    for t in range(self.ntemp):
+                        h.write('{:>8.4f}   '.format(self.band_ren[t,side,1]))
+                    if ifile>1:
+                        h.write('\n{:15s}'.format(''))
+                        for t in range(self.ntemp):
+                            h.write(' {:>6.2f}%   '.format(err[t,0]))
+                    h.write('\n{:15s}'.format('  VB'))
+                    for t in range(self.ntemp):
+                        h.write('{:>8.4f}   '.format(self.band_ren[t,side,0]))
+                    if ifile>1:
+                        h.write('\n{:15s}'.format(''))
+                        for t in range(self.ntemp):
+                            h.write(' {:>6.2f}%   '.format(err[t,1]))
+                    h.write('\n{:15s}'.format('  Gap'))
+                    for t in range(self.ntemp):
+                        h.write('{:>8.4f}   '.format(self.gap_ren[t,side]))
+                    if ifile>1:
+                        h.write('\n{:15s}'.format(''))
+                        for t in range(self.ntemp):
+                            h.write(' {:>6.2f}%   '.format(err[t,2]))
+
+                else:
+                    print('error calculation not implemented')
+                    h.write('\n{:15s}'.format('  CB'))
+                    for t in range(self.ntemp):
+                        h.write('{:>8.4f}   '.format(self.band_ren[t,1]))
+                    h.write('\n{:15s}'.format('  VB'))
+                    for t in range(self.ntemp):
+                        h.write('{:>8.4f}   '.format(self.band_ren[t,0]))
+                    h.write('\n{:15s}'.format('  Gap'))
+                    for t in range(self.ntemp):
+                        h.write('{:>8.4f}   '.format(self.gap_ren[t]))
+####### FROM HERE
+        limms = [[-50.,50.],[-2.,50.],[-90.,40.]]
+##########FIX ME : add default data and if condition
+        limms = [self.cond_ylims, self.val_ylims, self.gap_ylims]
+        for i in range(3):
+#            lims = _arr[i,0].get_ylim() 
+            ylims = limms[i]    
+            self.set_vrefs(_arr[i][0], self.temp, 0.,style='dashed')
+            _arr[i,0].set_ylim(limms[i])
+
+
+            if self.split:
+                self.set_vrefs(_arr2[i][0], self.temp, 0.)
+
+        
+        self.set_xaxis(_arr[2][0], self.temp)
+        self.set_yaxis_separate(_arr[0][0], 'CBM ren ({})'.format(self.gap_units),self.cond_ylims, self.cond_yticks)
+        self.set_yaxis_separate(_arr[1][0], 'VBM ren ({})'.format(self.gap_units),self.val_ylims, self.val_yticks)
+        self.set_yaxis_separate(_arr[2][0], 'Gap ren ({})'.format(self.gap_units),self.gap_ylims, self.gap_yticks)
+
+
+        self.set_yaxis(_arr[0][0], 'CBM ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr[1][0], 'VBM ren ({})'.format(self.gap_units))
+        self.set_yaxis(_arr[2][0], 'Gap ren ({})'.format(self.gap_units))
+
+        fig.subplots_adjust(left=0.11,bottom=0.08,right=0.81,top=0.95,wspace=0.2,hspace=0.12)
+
+        if self.split:
+            self.set_xaxis(_arr2[2][0], self.temp)
+            self.set_yaxis_separate(_arr2[0][0], 'CB ren ({})'.format(self.gap_units),self.cond_ylims, self.cond_yticks)
+            self.set_yaxis_separate(_arr2[1][0], 'VB ren ({})'.format(self.gap_units),self.val_ylims, self.val_yticks)
+            self.set_yaxis_separate(_arr2[2][0], 'Gap ren ({})'.format(self.gap_units),self.gap_ylims, self.gap_yticks)
+
+            self.set_title(_arr[0][0], self.title[0])
+            self.set_title(_arr2[0][0], self.title[1])
+
+        else:
+            if self.main_title:
+                self.set_title(_arr[0][0], self.main_title)
+
+        if file_qty < 7:
+            ncol = file_qty
+        else:
+            ncol = 6
+        legend1 = _arr[0][0].legend(loc=9,bbox_to_anchor=(0.5,1.50),fontsize=24, handletextpad=0.4,handlelength=1.0,frameon=True,ncol = ncol,columnspacing=0.7)
+        _arr[0][0].add_artist(legend1)
+        
+        fig.subplots_adjust(hspace=0.0,top=0.85,right=0.90,bottom=0.10,left=0.12)
+
+        if self.split:
+            fig.align_ylabels()
+            fig2.align_ylabels()
+            self.save_figure_split(fig,fig2)
+        else:
+            fig.align_ylabels()
+            self.save_figure(fig)
+
+###### TO HERE
+#
+#        for i in range(3):
+#            self.set_vrefs(_arr[i][0], self.temp, 0.)
+#
+#            if self.split:
+#                self.set_vrefs(_arr2[i][0], self.temp, 0.)
+#
+#        
+#        self.set_xaxis(_arr[2][0], self.temp)
+#        self.set_yaxis(_arr[0][0], 'CB ren ({})'.format(self.gap_units))
+#        self.set_yaxis(_arr[1][0], 'VB ren ({})'.format(self.gap_units))
+#        self.set_yaxis(_arr[2][0], 'Gap ren ({})'.format(self.gap_units))
+#
+#
+#        if self.split:
+#            self.set_xaxis(_arr2[2][0], self.temp)
+#            self.set_yaxis(_arr2[0][0], 'CB ren ({})'.format(self.gap_units))
+#            self.set_yaxis(_arr2[1][0], 'VB ren ({})'.format(self.gap_units))
+#            self.set_yaxis(_arr2[2][0], 'Gap ren ({})'.format(self.gap_units))
+#
+#            self.set_title(_arr[0][0], self.title[0])
+#            self.set_title(_arr2[0][0], self.title[1])
+#
+#        else:
+#            if self.main_title is not None:
+#                self.set_title(_arr[0][0], self.main_title)
+#
+####
+#
+#        self.set_legend_gap(_arr[2][0])
+#        if self.main_title is not None:
+#            self.set_main_title(fig) 
+#
+#        if self.split:
+#            self.set_legend_gap(_arr2[2][0])
+#
+#            self.set_title(_arr[0][0], self.title[0])
+#            self.set_title(_arr2[0][0], self.title[1])
+#
+#            if self.main_title is not None:
+#                self.set_main_title(fig2)
+#
+#        if self.split:
+#            self.save_figure_split(fig,fig2)
+#        else:
+#            self.save_figure(fig)
+
+#        plt.show()
+ 
+    def plot_total_gap(self):
+
+        print(self.ylims)
+        print('Warning: for now, this code simply sums up the ZPR^EPI and ZPR^TE, assuming that the gap remains at the same location.')
+        if not self.zpr_fnames and self.te_fnames:
+            raise Exception('For total pgap, both te_fnames and zpr_fnames must be provided')
+
+        file_qty = len(self.te_fnames)
+        if len(self.te_fnames) != file_qty:
+            raise Exception('zpr_fnames and te_fnames must contain the same number of files, but zpr_fnames has {} and te_fnames has {}.'.format(file_qty, len(te_fnames)))
+
+        # Define figure
+        fig, _arr = plt.subplots(1,1, figsize=self.figsize, squeeze=False)
+
+        if self.split:
+            fig2, _arr2 = plt.subplots(1,1, figsize=self.figsize, squeeze=False)
+
+        # Read and treat all input files
+        for ifile, te_file in enumerate(self.te_fnames):
+                
+
+            # Define file class
+            self.te = TEfile(self.te_fnames[ifile], read=False)
+            self.zpr = ZPRfile(self.zpr_fnames[ifile], read = False)
+
+            # Read input files
+            self.te.read_nc()
+            self.zpr.read_nc()
+
+            # Set parameters for this file
+            self.nsppol = self.zpr.nsppol
+            self.nkpt = self.zpr.nkpt
+            self.max_band = self.zpr.max_band
+            self.ntemp = self.zpr.ntemp
+            self.temp = self.zpr.temp
+            self.kpoints = self.zpr.kpoints
+  
+            # Add indirect/direct gap information
+            self.gap_units = self.zpr.gap_energy_units
+            if self.te.gap_energy_units != self.gap_units:
+                raise Exception('TE and ZPR files do not have the same energy units. Implement unit conversion.')
+
+            if self.indirect:
+                if self.split:
+                    self.gap_ren = self.te.indirect_gap_ren_split + self.zpr.indirect_gap_ren_split
+                    self.zpr_ren = self.zpr.indirect_gap_ren_split
+                    self.te_ren = self.te.indirect_gap_ren_split
+                else:
+                    self.gap_ren = self.te.indirect_gap_ren + self.zpr.indirect_gap_ren
+                    self.zpr_ren = self.zpr.indirect_gap_ren
+                    self.te_ren = self.te.indirect_gap_ren
+
+            else:
+                if self.split:
+                    self.gap_ren = self.te.gap_renormalization_split + self.zpr.gap_renormalization_split
+                    self.zpr_ren = self.zpr.gap_renormalization_split
+                    self.te_ren = self.te.gap_renormalization_split
+
+                else:
+                    self.gap_ren = self.te.gap_renormalization + self.zpr.gap_renormalization
+                    self.zpr_ren = self.zpr.gap_renormalization
+                    self.te_ren = self.te.gap_renormalization
+
+
+            if self.split:
+                if self.expdata:
+                    raise Exception("Experimental data option not implemented for split yet")
+
+                else:
+                    if self.split_zpr_te:
+                        _arr[0][0].plot(self.temp, self.zpr_ren[:,0], marker='o', linewidth=1.5, color=highcontrast['red'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                        _arr2[0][0].plot(self.temp, self.zpr_ren[:,1], marker='o', linewidth=1.5, color=highcontrast['red'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                        _arr[0][0].plot(self.temp, self.te_ren[:,0], marker='o', linewidth=1.5, color=highcontrast['yellow'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                        _arr2[0][0].plot(self.temp, self.te_ren[:,1], marker='o', linewidth=1.5, color=highcontrast['yellow'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr[0][0].plot(self.temp, self.gap_ren[:,0], marker='o', linewidth=1.5, color=highcontrast['blue'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr2[0][0].plot(self.temp, self.gap_ren[:,1], marker='o', linewidth=1.5, color=highcontrast['blue'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+
+            else:
+                if self.expdata:
+                    print('zero gap value', self.zero_gap_value)
+                    if self.gap_units == self.expdata.yaxis_units:
+                        # they are both the same, no need to convert
+                        if self.zero_gap_value:
+                            if self.zero_gap_units == self.gap_units:
+                                shift = self.zero_gap_value-self.gap_ren[0]
+                                shift_zpr = self.zero_gap_value-self.zpr_ren[0]
+                                shift_te = self.zero_gap_value-self.te_ren[0]
+
+                            else:
+                                if self.zero_gap_units == 'eV' and self.gap_units == 'meV':
+                                    shift = self.zero_gap_value*1E3-self.gap_ren[0]
+                                    shift_zpr = self.zero_gap_value*1E3-self.zpr_ren[0]
+                                    shift_te = self.zero_gap_value*1E3-self.te_ren[0]
+
+                                elif self.zero_gap_units == 'meV' and self.gap_units == 'eV':
+                                    shift = self.zero_gap_value*1E-3-self.gap_ren[0]
+                                    shift_zpr = self.zero_gap_value*1E-3-self.zpr_ren[0]
+                                    shift_te = self.zero_gap_value*1E-3-self.te_ren[0]
+
+                                else:
+                                    raise Exception('Please provide zero gap value in eV or meV')
+
+                        else:
+                            shift = 0.
+                            shift_zpr = 0.
+                            shift_te = 0.
+
+                        if self.split_zpr_te:
+                            _arr[0][0].plot(self.temp, self.zpr_ren+shift_zpr, marker='o', linewidth=1.5, color=highcontrast['red'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                            _arr[0][0].plot(self.temp, self.te_ren+shift_te, marker='o', linewidth=1.5, color=highcontrast['yellow'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                        _arr[0][0].plot(self.temp, self.gap_ren+shift, marker='o', linewidth=1.5, color=highcontrast['blue'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                        _arr[0][0].plot(self.expdata.xaxis, self.expdata.yaxis, marker='s', linestyle='None',color='black')
+
+                    else:
+                        # the only case I write for now is meV to eV. Add Hartree to eV later??
+                        if self.gap_units == 'meV' and self.expdata.yaxis_units == 'eV':
+
+                            if self.expdata.xaxis_units != 'K':
+                                raise Exception('Temperature axis must be in Kelvin')
+
+                            if self.zero_gap_value:
+                                if self.zero_gap_units == 'eV':
+                                    shift = self.zero_gap_value-self.gap_ren[0]*1E-3
+                                    shift_zpr = self.zero_gap_value-self.zpr_ren[0]*1E-3
+                                    shift_te = self.zero_gap_value-self.te_ren[0]*1E-3
+
+                                elif self.zero_gap_units == 'meV':
+                                    shift = (self.zero_gap_value-self.gap_ren[0])*1E-3
+                                    shift_zpr = (self.zero_gap_value-self.zpr_ren[0])*1E-3
+                                    shift_te = (self.zero_gap_value-self.te_ren[0])*1E-3
+
+                                else:
+                                    raise Exception('Please provide zero gap value in eV or meV')
+                            else:
+                                shift = 0.
+                                shift_zpr = 0
+                                shift_te = 0.
+
+                            if self.split_zpr_te:
+                                _arr[0][0].plot(self.temp, self.zpr_ren*1E-3+shift_zpr, marker='o', linewidth=1.5, color=highcontrast['red'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                                _arr[0][0].plot(self.temp, self.te_ren*1E-3+shift_te, marker='o', linewidth=1.5, color=highcontrast['yellow'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                            _arr[0][0].plot(self.temp, self.gap_ren*1E-3+shift, marker='o', linewidth=1.5, color=highcontrast['blue'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+
+                            _arr[0][0].plot(self.expdata.xaxis, self.expdata.yaxis, marker='s', linestyle='None',color='black')
+
+       
+                else:
+                    if self.split_zpr_te:
+                        _arr[0][0].plot(self.temp, self.zpr_ren, marker='o', linewidth=1.5, color=highcontrast['red'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                        _arr[0][0].plot(self.temp, self.te_ren, marker='o', linewidth=1.5, color=highcontrast['yellow'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                    _arr[0][0].plot(self.temp, self.gap_ren, marker='o', linewidth=1.5, color=highcontrast['blue'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+
+        ## Custom slopes, remove afterwards
+        imin = self.locate_temp_index(220)
+        imax = self.locate_temp_index(300)
+        fit_lowt = np.polyfit(self.temp[imin:imax+1], self.gap_ren[imin:imax+1]*1E-3+shift, 1)
+        fit_exp = np.polyfit(self.expdata.xaxis[-6:], self.expdata.yaxis[-6:], 1)
+        print('lowt: {} eV, ZPR = {} meV'.format(fit_lowt[1],(self.zero_gap_value-fit_lowt[1])*1E3))
+        print('exp: {} eV, ZPR = {} meV'.format(fit_exp[1],(self.zero_gap_value-fit_exp[1])*1E3))
+
+        dummy_yexp = fit_exp[0]*self.temp[:imax+3] + fit_exp[1]
+#        _arr[0][0].plot(self.temp[:imax+3], dummy_yexp, color='darkslategray', linestyle='dashed')
+#        _arr[0][0].text(108, 3.135, r'ZPR$\approx$53 meV (exp)', fontsize=26, color='darkslategray')
+#        _arr[0][0].text(108, 3.1475, r'ZPR$\approx$54 meV (220-300K)', fontsize=26, color='darkturquoise')
+#        _arr[0][0].text(450, 3.1050, r'ZPR$\approx$53 meV (exp)', fontsize=26, color='darkslategray')
+#        _arr[0][0].text(450, 3.135, r'ZPR$\approx$54 meV (220-300K)', fontsize=26, color='darkturquoise')
+
+        dummy_y = fit_lowt[0]*self.temp[:imax+3] + fit_lowt[1]
+#        _arr[0][0].plot(self.temp[:imax+3],dummy_y, color='darkturquoise', linestyle='dashed')
+
+        imin = self.locate_temp_index(500)
+        imax = self.locate_temp_index(700)
+        fit_midt = np.polyfit(self.temp[imin:imax+1], self.gap_ren[imin:imax+1]*1E-3+shift, 1)
+        print('midt: {} eV, ZPR = {} meV'.format(fit_midt[1],(self.zero_gap_value-fit_midt[1])*1E3))
+        dummy_ymid = fit_midt[0]*self.temp[:imax+3] + fit_midt[1]
+        #_arr[0][0].plot(self.temp[:imax+3],dummy_ymid, color=highcontrast['red'], linestyle='dashed')
+        #_arr[0][0].text(450, 3.165, r'ZPR$\approx$85 meV (500-700K)', fontsize=26, color=highcontrast['red'])
+
+        imax = self.locate_temp_index(800)
+        fit_hight = np.polyfit(self.temp[imax:], self.gap_ren[imax:]*1E-3+shift, 1)
+        print('hight: {} eV, ZPR = {} meV'.format(fit_hight[1],(self.zero_gap_value-fit_hight[1])*1E3))
+        dummy_yhigh = fit_hight[0]*self.temp + fit_hight[1]
+        #_arr[0][0].plot(self.temp,dummy_yhigh, color=highcontrast['yellow'], linestyle='dashed')
+        #_arr[0][0].text(450, 3.195, r'ZPR$\approx$99 meV (800-1000K)', fontsize=26, color=highcontrast['yellow'])
+        print('FP ZPR: {} meV'.format(self.gap_ren[0]))
+
+        tdebye = 414
+        #self.ylims = _arr[0][0].get_ylim()
+        self.set_hrefs(self.ylims, _arr[0][0], tdebye, 'k', style='dotted')
+        _arr[0][0].text(420, 2.65, r'$\theta_D$=414K', color='k', fontsize=26)
+
+        self.set_xaxis(_arr[0][0], self.temp)
+##        self.set_vrefs(_arr[0][0], self.temp, 0.)
+        if self.expdata:
+            self.set_yaxis(_arr[0][0], 'Gap energy ({})'.format(self.expdata.yaxis_units))
+        else:
+            self.set_yaxis(_arr[0][0], 'Gap renormalization ({})'.format(self.gap_units))
+        self.set_legend_total_gap(_arr[0][0])
+        self.set_main_title(fig) 
+
+        if self.split:
+            self.set_xaxis(_arr2[0][0], self.temp)
+            self.set_vrefs(_arr2[0][0], self.temp, 0.)
+            self.set_yaxis(_arr2[0][0], 'Gap renormalization ({})'.format(self.gap_units))
+            self.set_legend_gap(_arr2[0][0])
+
+            self.set_title(_arr[0][0], self.title[0])
+            self.set_title(_arr2[0][0], self.title[1])
+
+            self.set_main_title(fig2)
+               
+
+        if self.split:
+            self.save_figure_split(fig,fig2)
+        else:
+            self.save_figure(fig)
+
+        plt.show()
+
+    def plot_total_gap_separate(self):
+
+        raise Exception('plot_total_gap_separate is not yet implemented')
+
     def plot_pgap(self):
 
         file_qty = len(self.zpr_fnames)
@@ -7929,9 +8555,12 @@ class ZPR_plotter(object):
             else:
                 f.set_xlim(self.omega_se[0], self.omega_se[-1])
 
-        if self.gap:
+        if self.gap or self.te_gap or self.total_gap:
             cut = 0.02*max(self.temp)
-            lims = (-5, 1.01*max(self.temp))
+            #lims = (-5, 1.01*max(self.temp))
+            #lims = (0, 1.01*max(self.temp))
+
+            lims = (0, 350)
             f.set_xlim(lims)
             f.set_xlabel('Temperature (K)', fontsize=32)
             f.xaxis.set_major_formatter(FuncFormatter(self.label_formatter))
@@ -7992,7 +8621,11 @@ class ZPR_plotter(object):
                 lims = f.get_ylim()
                 f.set_ylim(lims)
 
-        f.yaxis.set_major_formatter(FuncFormatter(self.label_formatter))
+#        f.yaxis.set_major_formatter(FuncFormatter(self.label_formatter))
+        if self.total_gap and self.expdata:
+            f.yaxis.set_major_formatter(FuncFormatter(self.float_label_formatter))
+        else:
+            f.yaxis.set_major_formatter(FuncFormatter(self.label_formatter))
 
         if self.yticks is not None:
             plt.setp(f.get_yticklabels(), fontsize=26)
@@ -8012,7 +8645,11 @@ class ZPR_plotter(object):
             lims = f.get_ylim()
             f.set_ylim(lims)
 
-        f.yaxis.set_major_formatter(FuncFormatter(self.label_formatter))
+        if self.total_gap and self.expdata:
+            f.yaxis.set_major_formatter(FuncFormatter(self.float_label_formatter))
+        else:
+            f.yaxis.set_major_formatter(FuncFormatter(self.label_formatter))
+
 
         if ticks is not None:
             plt.setp(f.get_yticklabels(), fontsize=26)
@@ -8042,6 +8679,9 @@ class ZPR_plotter(object):
     def label_formatter(self,x, pos):
         return "%i" %x
 
+    def float_label_formatter(self, x, pos):
+        return "%4.2f" %x
+
     def set_hrefs(self, lims, f, val,col,style='solid'):
 
         print(lims)
@@ -8056,9 +8696,9 @@ class ZPR_plotter(object):
 #            f.plot(zer,y,'k:')
 #        else:
         if style=='dashed':
-            f.plot(zer,y,color=col,linestyle=style, dashes=(4,4))
+            f.plot(zer,y,color=col,linestyle=style, dashes=(4,4), zorder=-1)
         else:
-            f.plot(zer,y,color=col,linestyle=style)
+            f.plot(zer,y,color=col,linestyle=style, zorder=-1)
 
 
     def set_vrefs(self,f,x,val,style='solid'):
@@ -8136,6 +8776,19 @@ class ZPR_plotter(object):
         #f.legend(numpoints=1, loc=3, fontsize=16)
         f.legend(numpoints = 1, loc = 'center right', bbox_to_anchor=(1.10,2.0), ncol = 1, fontsize=12)
 
+    def set_legend_total_gap(self, f):
+        #f.legend(numpoints=1, loc=3, fontsize=16)
+        handles = []
+        if self.split_zpr_te:
+            handles.append(Line2D([0],[0], marker='o', color=highcontrast['red'], label=r'EPI'))
+            handles.append(Line2D([0],[0], marker='o', color=highcontrast['yellow'], label=r'TE'))
+        handles.append(Line2D([0],[0], marker='o', color=highcontrast['blue'], label=r'total'))
+        if self.expdata:
+            handles.append(Line2D([0],[0], marker='s', color='k', label=r'exp', linestyle='None', markersize=8))
+
+
+        f.legend(handles = handles, numpoints = 1, loc = 'lower left', bbox_to_anchor=(0.01,0.01), ncol = 1, fontsize=26)
+
 
     def set_legend_vbcb(self, f):
 #        box = f.get_position()
@@ -8159,7 +8812,7 @@ class ZPR_plotter(object):
                 t = self.main_title+', Kpt : '+str(self.kpoints[self.point_for_se])
             else:
                 t = self.main_title
-            g.suptitle(t, fontsize=18)
+            g.suptitle(t, fontsize=26)
 
     def save_figure(self,g):
 
@@ -8313,6 +8966,8 @@ def plotter(
         senergy = False,
         broad = False,
         gap = False,
+        te_gap = False,
+        total_gap = False,
         te_pgap = False,
         pgap = False,
         total_pgap = False,
@@ -8326,6 +8981,7 @@ def plotter(
         unpert = False,
         split_contribution = False,
         split_occupied_subspace = False,
+        split_zpr_te = False,
         modes = False,
         verbose = False,
         zero_gap_value = None,
@@ -8399,6 +9055,7 @@ def plotter(
             zero_gap_value = zero_gap_value,
             zero_gap_units = zero_gap_units,
             experimental_data = experimental_data,
+            split_zpr_te = split_zpr_te,
 
             subplots = subplots,
             main_title = main_title,
@@ -8410,6 +9067,8 @@ def plotter(
             spectral = spectral,
             broad = broad,
             gap = gap,
+            te_gap = te_gap,
+            total_gap = total_gap,
             pgap = pgap,
             vbcb = vbcb,
             te_pgap = te_pgap,
@@ -8456,6 +9115,20 @@ def plotter(
                 zpr_plot.plot_gap_separate()
             else:
                 zpr_plot.plot_gap()
+
+        if te_gap:
+            if separate_bands:
+                zpr_plot.plot_te_gap_separate()
+            else:
+                print('In')
+                zpr_plot.plot_te_gap()
+
+        if total_gap:
+            if separate_bands:
+                zpr_plot.plot_total_gap_separate()
+            else:
+                zpr_plot.plot_total_gap()
+
 
         # plot valence band and conduction band ZPR separately
         if vbcb:
