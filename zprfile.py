@@ -107,11 +107,11 @@ class ZPRfile(CDFfile):
 #            self.qpt_weight = ncdata.variables['qpt_weight'][:]
 #            self.ddw_tdep = ncdata.variables['ddw_tdep'][:, :, :] # mode temp qpt
 
-            self.zpr_qpath = ncdata.variables['reduced_zpr_qpath'][:,:,:,:,:]
-            self.zpr_qpath_fan = ncdata.variables['reduced_zpr_qpath_fan'][:,:,:,:,:]
-            self.zpr_qpath_ddw = ncdata.variables['reduced_zpr_qpath_ddw'][:,:,:,:,:]
-            self.gkk2_qpath_fan = ncdata.variables['reduced_gkk2_qpath_fan'][:,:,:,:,:]
-            self.gkk2_qpath_ddw = ncdata.variables['reduced_gkk2_qpath_ddw'][:,:,:,:,:]
+#            self.zpr_qpath = ncdata.variables['reduced_zpr_qpath'][:,:,:,:,:]
+#            self.zpr_qpath_fan = ncdata.variables['reduced_zpr_qpath_fan'][:,:,:,:,:]
+#            self.zpr_qpath_ddw = ncdata.variables['reduced_zpr_qpath_ddw'][:,:,:,:,:]
+#            self.gkk2_qpath_fan = ncdata.variables['reduced_gkk2_qpath_fan'][:,:,:,:,:]
+#            self.gkk2_qpath_ddw = ncdata.variables['reduced_gkk2_qpath_ddw'][:,:,:,:,:]
 
 
     @property

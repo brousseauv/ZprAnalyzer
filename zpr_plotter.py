@@ -2036,14 +2036,14 @@ class ZPR_plotter(object):
         print('exp: {} eV, ZPR = {} meV'.format(fit_exp[1],(self.zero_gap_value-fit_exp[1])*1E3))
 
         dummy_yexp = fit_exp[0]*self.temp[:imax+3] + fit_exp[1]
-#        _arr[0][0].plot(self.temp[:imax+3], dummy_yexp, color='darkslategray', linestyle='dashed')
-#        _arr[0][0].text(108, 3.135, r'ZPR$\approx$53 meV (exp)', fontsize=26, color='darkslategray')
-#        _arr[0][0].text(108, 3.1475, r'ZPR$\approx$54 meV (220-300K)', fontsize=26, color='darkturquoise')
-#        _arr[0][0].text(450, 3.1050, r'ZPR$\approx$53 meV (exp)', fontsize=26, color='darkslategray')
-#        _arr[0][0].text(450, 3.135, r'ZPR$\approx$54 meV (220-300K)', fontsize=26, color='darkturquoise')
+        _arr[0][0].plot(self.temp[:imax+3], dummy_yexp, color='darkslategray', linestyle='dashed')
+        _arr[0][0].text(108, 3.135, r'ZPR$\approx$-53 meV (exp)', fontsize=26, color='darkslategray')
+        #_arr[0][0].text(108, 3.1475, r'ZPR$\approx$-54 meV (220-300K)', fontsize=26, color='darkturquoise')
+        #_arr[0][0].text(450, 3.1050, r'ZPR$\approx$-53 meV (exp)', fontsize=26, color='darkslategray')
+        #_arr[0][0].text(450, 3.135, r'ZPR$\approx$-54 meV (220-300K)', fontsize=26, color='darkturquoise')
 
         dummy_y = fit_lowt[0]*self.temp[:imax+3] + fit_lowt[1]
-#        _arr[0][0].plot(self.temp[:imax+3],dummy_y, color='darkturquoise', linestyle='dashed')
+        #_arr[0][0].plot(self.temp[:imax+3],dummy_y, color='darkturquoise', linestyle='dashed')
 
         imin = self.locate_temp_index(500)
         imax = self.locate_temp_index(700)
@@ -2051,20 +2051,24 @@ class ZPR_plotter(object):
         print('midt: {} eV, ZPR = {} meV'.format(fit_midt[1],(self.zero_gap_value-fit_midt[1])*1E3))
         dummy_ymid = fit_midt[0]*self.temp[:imax+3] + fit_midt[1]
         #_arr[0][0].plot(self.temp[:imax+3],dummy_ymid, color=highcontrast['red'], linestyle='dashed')
-        #_arr[0][0].text(450, 3.165, r'ZPR$\approx$85 meV (500-700K)', fontsize=26, color=highcontrast['red'])
+        #_arr[0][0].text(450, 3.165, r'ZPR$\approx$-85 meV (500-700K)', fontsize=26, color=highcontrast['red'])
 
         imax = self.locate_temp_index(800)
         fit_hight = np.polyfit(self.temp[imax:], self.gap_ren[imax:]*1E-3+shift, 1)
         print('hight: {} eV, ZPR = {} meV'.format(fit_hight[1],(self.zero_gap_value-fit_hight[1])*1E3))
         dummy_yhigh = fit_hight[0]*self.temp + fit_hight[1]
         #_arr[0][0].plot(self.temp,dummy_yhigh, color=highcontrast['yellow'], linestyle='dashed')
-        #_arr[0][0].text(450, 3.195, r'ZPR$\approx$99 meV (800-1000K)', fontsize=26, color=highcontrast['yellow'])
+        #_arr[0][0].text(450, 3.195, r'ZPR$\approx$-99 meV (800-1000K)', fontsize=26, color=highcontrast['yellow'])
         print('FP ZPR: {} meV'.format(self.gap_ren[0]))
 
         tdebye = 414
         #self.ylims = _arr[0][0].get_ylim()
         self.set_hrefs(self.ylims, _arr[0][0], tdebye, 'k', style='dotted')
         _arr[0][0].text(420, 2.65, r'$\theta_D$=414K', color='k', fontsize=26)
+        self.set_vrefs(_arr[0][0], self.temp, self.zero_gap_value+0.10393, style='dashed')
+#        _arr[0][0].text(20, 3.245, r'FP-ZPR=-104 meV', fontsize=26)
+        _arr[0][0].text(10, 3.2425, r'FP-ZPR=-104 meV', fontsize=26)
+
 
         self.set_xaxis(_arr[0][0], self.temp)
 ##        self.set_vrefs(_arr[0][0], self.temp, 0.)
