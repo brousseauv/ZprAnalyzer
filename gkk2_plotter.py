@@ -181,7 +181,9 @@ class Gkk2Plotter(object):
         fan1, ddw1 = self.extract_fan_ddw(data1)
         fan2, ddw2 = self.extract_fan_ddw(data2)
 
-        return np.abs(fan1-fan2), np.abs(ddw1-ddw2)
+#        return np.abs(fan1-fan2), np.abs(ddw1-ddw2)
+        return fan1-fan2, ddw1-ddw2
+
 
     def extract_fan_ddw(self, data):
         
@@ -222,7 +224,9 @@ class Gkk2Plotter(object):
         if title == 'single':
             cbar.set_label(r"$|g_{knn'}(\mathbf{q}\nu)|^2$", fontsize=16)
         if title == 'diff':
-            cbar.set_label(r"$|\Delta(|g_{knn'}(\mathbf{q}\nu)|^2)|$ (%s"%self.diff_labels[0]+"-%s"%self.diff_labels[1]+")", fontsize=16)
+#            cbar.set_label(r"$|\Delta(|g_{knn'}(\mathbf{q}\nu)|^2)|$ (%s"%self.diff_labels[0]+"-%s"%self.diff_labels[1]+")", fontsize=16)
+            cbar.set_label(r"$\Delta(|g_{knn'}(\mathbf{q}\nu)|^2)$ (%s"%self.diff_labels[0]+"-%s"%self.diff_labels[1]+")", fontsize=16)
+
 
     def show_valence(self, f, origin='upper'):
 
