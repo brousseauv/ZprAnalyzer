@@ -116,6 +116,7 @@ class EPCfile(CDFfile):
         self.spectral_function = None
         self.fan_g2 = None
         self.zpr_ren_modes = None
+        self.td_ren_modes = None
         self.qpt_weight = None
         self.fan_occ = None
         self.fan_unocc = None
@@ -136,6 +137,8 @@ class EPCfile(CDFfile):
             self.qpoints = ncdata.variables['reduced_coordinates_of_qpoints'][:,:]
             self.temp = ncdata.variables['temperatures'][:]
             self.td_ren = ncdata.variables['temperature_dependent_renormalization'][:,:,:,:]
+            self.td_ren_modes = ncdata.variables['temperature_dependent_renormalization_by_modes'][:,:,:,:,:]
+
         # ONLY IF RAN WITH MY DEVELOP BRANCH
 #            self.fan_occ = ncdata.variables['temperature_dependent_renormalization_fan_occ'][:,:,:,:]
 #            self.fan_unocc = ncdata.variables['temperature_dependent_renormalization_fan_unocc'][:,:,:,:]
@@ -145,6 +148,8 @@ class EPCfile(CDFfile):
 #            self.active = ncdata.variables['temperature_dependent_renormalization_active'][:,:,:,:]
             self.zpr_qpt = ncdata.variables['zero_point_renormalization_qpt'][:,:,:,:]
             self.zpr_qpt_modes = ncdata.variables['zero_point_renormalization_by_modes_qpt'][:,:,:,:,:]
+            self.tdr_qpt = ncdata.variables['temperature_dependent_renormalization_qpt'][:,:,:,:,:]
+            self.tdr_qpt_modes = ncdata.variables['temperature_dependent_renormalization_by_modes_qpt'][:,:,:,:,:,:]
 
             self.zp_ren = ncdata.variables['zero_point_renormalization'][:,:,:]
             self.zp_ren_modes = ncdata.variables['zero_point_renormalization_by_modes'][:,:,:,:]
@@ -375,7 +380,7 @@ class EigenvalueCorrections(object):
         self.spline_factor = spline_factor
 
         # Units warning
-        if self.units is not 'eV' and self.units is not 'meV':
+        if self.units != 'eV' and self.units != 'meV':
             raise Exception('Units must be eV or meV')
         if not self.valence:
             raise Exception('Must provide the last valence band number as valence')
@@ -403,9 +408,16 @@ class EigenvalueCorrections(object):
         self.nsym = self.out.nsym
         self.symrel = self.out.symrel
 
+#        if self.temperature and self.reduce_path and self.ntemp == 1:
+#            raise Exception("""You are setting temperature=True but there is only one temperature in the file.)
+#                            This will make the calculation fail if using reduce_path.
+#                            Action: add more temperatures to your EP.nc file.""")
+
         if self.temperature:
             if self.modes:
-                raise Exception('Mode decomposition only implemented at T=0 theory. Put Temperature to False.')
+#                raise Exception('Mode decomposition only implemented at T=0 theory. Put Temperature to False.')
+                self.td_ren = self.epc.td_ren_modes
+                self.td_ren = np.einsum('vsknt->sknt', self.td_ren)
             else:
                 self.td_ren = self.epc.td_ren
         else:
@@ -436,21 +448,37 @@ class EigenvalueCorrections(object):
         # Get contribution from each qpt and/or mode
         if self.contribution :
             if self.modes:
-                self.zpr_qpt_modes = self.epc.zpr_qpt_modes
-                self.zpr_qpt_modes = np.einsum('vsknq -> sknqv',self.zpr_qpt_modes) #(nsppol,nkpt,nband,nqpt,nmodes)
-                self.zp_ren_modes = self.epc.zp_ren_modes
-                self.zp_ren_modes = np.einsum('vskn->sknv',self.zp_ren_modes) #(nsppol,nkpt,nband,nmodes)
-                self.nmodes = self.epc.nmodes
-                #print('before')
-                #print(np.einsum
+                if self.temperature:
+                    self.tdr_qpt_modes = self.epc.tdr_qpt_modes
+                    self.tdr_qpt_modes = np.einsum('vskntq -> skntqv',self.tdr_qpt_modes) #(nsppol,nkpt,nband,ntemp,nqpt,nmodes)
+                    self.td_ren_modes = self.epc.td_ren_modes
+                    self.td_ren_modes = np.einsum('vsknt->skntv',self.td_ren_modes) #(nsppol,nkpt,nband,ntemp,nmodes)
+                    self.nmodes = self.epc.nmodes
+                else:
+                    self.zpr_qpt_modes = self.epc.zpr_qpt_modes
+                    self.zpr_qpt_modes = np.einsum('vsknq -> sknqv',self.zpr_qpt_modes) #(nsppol,nkpt,nband,nqpt,nmodes)
+                    self.zp_ren_modes = self.epc.zp_ren_modes
+                    self.zp_ren_modes = np.einsum('vskn->sknv',self.zp_ren_modes) #(nsppol,nkpt,nband,nmodes)
+                    self.nmodes = self.epc.nmodes
+                    #print('before')
+                    #print(np.einsum
 
             else:
-                self.zpr_qpt = self.epc.zpr_qpt
+                if self.temperature:
+                    self.tdr_qpt = self.epc.tdr_qpt #*nsppol,nkpt,nband,ntemp,nqpt)
+                else:
+                    self.zpr_qpt = self.epc.zpr_qpt
+
         else:
             if self.modes:
-                self.zp_ren_modes = self.epc.zp_ren_modes
-                self.zp_ren_modes = np.einsum('ijkl->jkli',self.zp_ren_modes) #(nsppol,nkpt,nband,nmodes)
-                self.nmodes = self.epc.nmodes
+                if self.temperature:
+                    self.td_ren_modes = self.epc.td_ren_modes
+                    self.td_ren_modes = np.einsum('vsknt->skntv',self.td_ren_modes) #(nsppol,nkpt,nband,ntemp,nmodes)
+                    self.nmodes = self.epc.nmodes
+                else:
+                    self.zp_ren_modes = self.epc.zp_ren_modes
+                    self.zp_ren_modes = np.einsum('vsnk->snkv',self.zp_ren_modes) #(nsppol,nkpt,nband,nmodes)
+                    self.nmodes = self.epc.nmodes
 
         if self.full_contribution or self.split_contribution: 
             self.fan_g2 = self.epc.fan_g2
@@ -491,26 +519,46 @@ class EigenvalueCorrections(object):
 
             self.reduced_td_ren = self.average_kpts(self.reduced_kpts_index, self.td_ren, self.ntemp)
 
-            if self.temperature is False:
+            if not self.temperature or self.ntemp == 1:
                 # Adjust array dimensions
                 self.reduced_td_ren = np.expand_dims(self.reduced_td_ren, axis=3)
 
             self.reduced_eigcorr = self.get_corrections(self.reduced_nkpt, self.reduced_eig0, self.reduced_td_ren)
             
             if self.contribution:
-                if self.modes:
-                    self.reduced_zp_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nmodes))
-                    self.reduced_zp_ren_modes = self.average_kpts(self.reduced_kpts_index, self.zp_ren_modes, self.nmodes)
-                    self.reduced_zpr_qpt_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nqpt, self.nmodes))
-                    for v in range(self.nmodes):
-                        self.reduced_zpr_qpt_modes[:,:,:,:,v] = self.average_kpts(self.reduced_kpts_index, self.zpr_qpt_modes[:,:,:,:,v], self.nqpt) 
+                if self.temperature:
+                    if self.modes:
+                        self.reduced_td_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.ntemp, self.nmodes))
+                        self.reduced_tdr_qpt_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.ntemp, self.nqpt, self.nmodes))
+                    
+                        for t in range(self.ntemp):
+                            self.reduced_td_ren_modes[:,:,:,t,:] = self.average_kpts(self.reduced_kpts_index, self.td_ren_modes[:,:,:,t,:], self.nmodes)
+                            for v in range(self.nmodes):
+                                self.reduced_tdr_qpt_modes[:,:,:,t,:,v] = self.average_kpts(self.reduced_kpts_index, self.tdr_qpt_modes[:,:,:,t,:,v], self.nqpt) 
+                    else:
+                        self.reduced_tdr_qpt = np.zeros((self.nsppol,self.reduced_nkpt,self.max_band, self.ntemp,self.nqpt))
+                        for t in range(self.ntemp):
+                            self.reduced_tdr_qpt[:,:,:,t,:] = self.average_kpts(self.reduced_kpts_index, self.tdr_qpt[:,:,:,t,:], self.nqpt)
+
                 else:
-                    self.reduced_zpr_qpt = np.zeros((self.nsppol,self.reduced_nkpt,self.max_band,self.nqpt))
-                    self.reduced_zpr_qpt[:,:,:,:] = self.average_kpts(self.reduced_kpts_index, self.zpr_qpt[:,:,:,:], self.nqpt)
+                    if self.modes:
+                        self.reduced_zp_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nmodes))
+                        self.reduced_zp_ren_modes = self.average_kpts(self.reduced_kpts_index, self.zp_ren_modes, self.nmodes)
+                        self.reduced_zpr_qpt_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nqpt, self.nmodes))
+                        for v in range(self.nmodes):
+                            self.reduced_zpr_qpt_modes[:,:,:,:,v] = self.average_kpts(self.reduced_kpts_index, self.zpr_qpt_modes[:,:,:,:,v], self.nqpt) 
+                    else:
+                        self.reduced_zpr_qpt = np.zeros((self.nsppol,self.reduced_nkpt,self.max_band,self.nqpt))
+                        self.reduced_zpr_qpt[:,:,:,:] = self.average_kpts(self.reduced_kpts_index, self.zpr_qpt[:,:,:,:], self.nqpt)
             else:
-                if modes:
-                    self.reduced_zp_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nmodes))
-                    self.reduced_zp_ren_modes = self.average_kpts(self.reduced_kpts_index, self.zp_ren_modes, self.nmodes)
+                if self.modes:
+                    if self.temperature:
+                        self.reduced_td_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.ntemp, self.nmodes))
+                        for v in range(self.nmodes):
+                            self.reduced_td_ren_modes[:,:,:,:,v] = self.average_kpts(self.reduced_kpts_index, self.td_ren_modes[:,:,:,:,v], self.ntemp)
+                    else:
+                        self.reduced_zp_ren_modes = np.zeros((self.nsppol, self.reduced_nkpt, self.max_band, self.nmodes))
+                        self.reduced_zp_ren_modes = self.average_kpts(self.reduced_kpts_index, self.zp_ren_modes, self.nmodes)
 
 
             if self.full_contribution or self.split_contribution:
@@ -682,6 +730,7 @@ class EigenvalueCorrections(object):
 
     def average_kpts(self, index, corr, dim):
         # Create reduced array and average corrections on symmetry-equivalent kpoints
+
         if dim == 1:
             reduced_corr = np.zeros((self.nsppol, len(index), self.max_band))
 
@@ -816,7 +865,7 @@ class EigenvalueCorrections(object):
                     else:
                         kpts = self.reduced_kpath
 
-                    if self.modes:
+                    if self.modes and not self.temperature:
                         self.gap_renorm_modes = self.get_mode_info(self.gap_loc,self.reduced_zp_ren_modes,False)
 
                         if self.split:
@@ -825,13 +874,13 @@ class EigenvalueCorrections(object):
                     if self.indirect:
                         self.indirect_gap_loc, self.indirect_gap_energy, self.indirect_gap_renorm, self.indirect_gap_energy_band, self.indirect_gap_renorm_band = self.get_indirect_gap_info(self.reduced_eig0, self.reduced_eigcorr, False)
 
-                        if self.modes:
+                        if self.modes and not self.temperature:
                             self.indirect_gap_renorm_modes = self.get_indirect_mode_info(self.indirect_gap_loc, self.reduced_zp_ren_modes,False)
 
                         if self.split:
                             self.indirect_gap_loc2, self.indirect_gap_energy2, self.indirect_gap_renorm2, self.indirect_gap_energy_band2, self.indirect_gap_renorm_band2 = self.get_indirect_gap_info(self.reduced_eig0, self.reduced_eigcorr, True)
 
-                            if self.modes:
+                            if self.modes and not self.temperature:
                                 self.indirect_gap_renorm_modes_split = self.get_indirect_mode_info(self.indirect_gap_loc2, self.reduced_zp_ren_modes, True)
                 
                 else:
@@ -1555,9 +1604,13 @@ class EigenvalueCorrections(object):
 
             data = dts.createVariable('eigenvalue_corrections_modes', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_modes'))
             data.units = "Hartree"
-            if self.modes:
+            if self.modes and not self.temperature:
                 data[:,:,:,:] = self.zp_ren_modes[:,:,:,:]
 
+            data = dts.createVariable('eigenvalue_corrections_temperature_dependent_modes', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_temperatures','number_of_modes'))
+            data.units = "Hartree"
+            if self.modes and self.temperature:
+                data[:,:,:,:,:] = self.td_ren_modes[:,:,:,:,:]
 
             data = dts.createVariable('corrected_eigenvalues', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_temperatures'))
             data.units = "Hartree"
@@ -1566,12 +1619,19 @@ class EigenvalueCorrections(object):
 
             ## Qpoint contribution
             data = dts.createVariable('qpt_contribution', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_qpoints'))
-            if self.contribution and not self.modes:
+            if self.contribution and not self.modes and not self.temperature:
                 data[:,:,:,:] = self.zpr_qpt[:,:,:,:]
             data = dts.createVariable('qpt_contribution_modes', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_qpoints','number_of_modes'))
-            if self.contribution and self.modes :
+            if self.contribution and self.modes and not self.temperature:
                 data[:,:,:,:,:] = self.zpr_qpt_modes[:,:,:,:,:]
 
+            # Qpoint contribution with temperature
+            data = dts.createVariable('qpt_contribution_temperature_dependent', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_temperatures', 'number_of_qpoints'))
+            if self.contribution and self.temperature and not self.modes:
+                data[:,:,:,:,:] = self.tdr_qpt[:,:,:,:,:]
+            data = dts.createVariable('qpt_contribution_temperature_dependent_modes', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_temperatures','number_of_qpoints','number_of_modes'))
+            if self.contribution and self.modes and self.temperature:
+                data[:,:,:,:,:,:] = self.tdr_qpt_modes[:,:,:,:,:,:]
 
             ## ZP Self-energy
             data = dts.createVariable('self_energy', 'd', ('number_of_spins', 'number_of_kpoints', 'number_of_bands', 'number_of_frequencies', 'cplex'))
@@ -1735,22 +1795,22 @@ class EigenvalueCorrections(object):
             # Mode decomposition data
             data = dts.createVariable('gap_renormalization_by_modes','d', ('number_of_modes','cplex'))
             data.units = self.units
-            if self.modes:
+            if self.modes and not self.temperature:
                 data[:,:] = self.gap_renorm_modes[:,:]
 
             data = dts.createVariable('gap_renormalization_by_modes_split','d', ('number_of_modes','cplex','cplex'))
             data.units = self.units
-            if self.modes and self.split:
+            if self.modes and self.split and not self.temperature:
                 data[:,:,:] = self.gap_renorm_modes_split[:,:,:]
 
             data = dts.createVariable('indirect_gap_renormalization_by_modes','d', ('number_of_modes','cplex'))
             data.units = self.units
-            if self.modes:
+            if self.modes and not self.temperature:
                 data[:,:] = self.indirect_gap_renorm_modes[:,:]
 
             data = dts.createVariable('indirect_gap_renormalization_by_modes_split','d', ('number_of_modes','cplex','cplex'))
             data.units = self.units
-            if self.modes and self.split:
+            if self.modes and self.split and not self.temperature:
                 data[:,:,:] = self.indirect_gap_renorm_modes_split[:,:,:]
 
 
@@ -1772,7 +1832,7 @@ class EigenvalueCorrections(object):
                 data[:,:,:,:] = self.reduced_td_ren[:,:,:,:]
 
             data = dts.createVariable('reduced_eigenvalue_corrections_modes', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands', 'number_of_modes'))
-            if self.reduce_path and self.modes:
+            if self.reduce_path and self.modes and not self.temperature:
                 data[:,:,:,:] = self.reduced_zp_ren_modes[:,:,:,:]
 
             data = dts.createVariable('reduced_corrected_eigenvalues', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands', 'number_of_temperatures'))
@@ -1781,11 +1841,11 @@ class EigenvalueCorrections(object):
 
 
             data = dts.createVariable('reduced_zpr_qpt_contribution', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands', 'number_of_qpoints'))
-            if self.contribution and not self.modes:
+            if self.contribution and not self.modes and not self.temperature:
                 data[:,:,:,:] = self.reduced_zpr_qpt[:,:,:,:]
 
             data = dts.createVariable('reduced_qpt_contribution_modes', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands', 'number_of_qpoints','number_of_modes'))
-            if self.contribution and self.modes:
+            if self.contribution and self.modes and not self.temperature:
                 data[:,:,:,:,:] = self.reduced_zpr_qpt_modes[:,:,:,:,:]
 
             data = dts.createVariable('reduced_self_energy', 'd', ('number_of_spins', 'number_of_reduced_kpoints', 'number_of_bands', 'number_of_frequencies', 'cplex'))
