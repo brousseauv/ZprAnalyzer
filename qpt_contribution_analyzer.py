@@ -903,11 +903,11 @@ class QptContribution(object):
         else:
             if self.nfile > 1 and self.flist_labels:
                 handles = []
-                alpha = [0.5, 1.0]
+                alpha = [0.4, 1.0]
                 for i in range(self.nfile):
                     if self.mode or self.ratio_with_mode:
                         #handles.append(Line2D([0], [0], linewidth=3.0, color='k', label=self.flist_labels[i], linestyle='solid', alpha=alpha[i]))
-                        handles.append(Patch(edgecolor='k', facecolor='k', alpha=alpha[i], label=self.flist_labels[i], linewidth=4.0))
+                        handles.append(Patch(edgecolor='None', facecolor='k', alpha=alpha[i], label=self.flist_labels[i], linewidth=4.0))
                         #[Patch(edgecolor='k', facecolor='k', hatch='///', label=r'Ce-$f$')]
                     else:
                         handles.append(Line2D([0], [0], linewidth=3.0, color=self.color[i], label=self.flist_labels[i], linestyle=self.linestyle[i]))
