@@ -1,2 +1,2 @@
 # ZprAnalyzer
-Analyses the output from ElectronPhononCoupling module.
+Analyses the output from the [ElectronPhononCoupling module](https://github.com/GkAntonius/ElectronPhononCoupling).
