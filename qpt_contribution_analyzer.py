@@ -13,6 +13,8 @@ import os
 from colorpalettes import bright, vibrant, highcontrast 
 import seaborn as sns
 from scipy.interpolate import UnivariateSpline
+from matplotlib.patches import Rectangle
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
 rc('text', usetex=True)
 rc('font', family='sans-serif')
 
@@ -33,6 +35,10 @@ class QptContribution(object):
                  band_index=None,
                  bz_weight=True,
                  kpt_index=0,
+                 temp_target=None,
+                 temperature=None,
+                 histogram_is_filled=True,
+                 separate_mode_histograms=False,
 
                  figsize=(8, 8),
                  title=None,
@@ -62,6 +68,8 @@ class QptContribution(object):
         self.linestyle = linestyle
         self.savefig = savefig
         self.flist_labels = flist_labels
+        self.histogram_is_filled = histogram_is_filled
+        self.separate_mode_histograms = separate_mode_histograms
 
         if qptcont_flist and qptcont_farr:
             raise Exception('Cannot simultaneously define qptcont_flist (for individual plots) and qptcont_farr (for ratios).')
@@ -122,6 +130,8 @@ class QptContribution(object):
                     qptcont2 = ZPRfile(fname=qptcont_farr[n][1], read=False)
                     qptcont2.read_nc()
 
+                    # Fix me: add temp_target option                       
+
                     # get data
                     self.zpr_qpt = qptcont1.reduced_zpr_qpt[0, kpt_index, self.band_index[n][0], :]*ha_to_ev*1E3
                     self.qpoints = qptcont1.qpoints
@@ -164,6 +174,7 @@ class QptContribution(object):
                 raise Exception('Individual Mode Ratios not yet implemented for histogram ratio')
 
             else:
+                # FIX ME: add temp_target option
                 print('\nComputing the ratio of the histograms of qpt contribution of\n{}\n    vs\n{}'.format(qptcont_flist[0], qptcont_flist[1]))
                 qptcont1 = ZPRfile(fname=qptcont_flist[0], read=False)
                 qptcont1.read_nc()
@@ -215,6 +226,7 @@ class QptContribution(object):
                 self.plot_qpt_contribution_ratio_with_mode(ax)
 
         else:
+            # Normal case, no ratio.
             for n in range(self.nfile):
                 print('\nTreating {}...'.format(os.path.basename(qptcont_flist[n])))
                 qptcont = ZPRfile(fname=qptcont_flist[n], read=False)
@@ -226,8 +238,14 @@ class QptContribution(object):
                     self.nmode = qptmode.nmodes
                     self.natom = np.int(self.nmode/3)
 
-                # get data
-                self.zpr_qpt = qptcont.reduced_zpr_qpt[0, kpt_index, self.band_index[n], :]*ha_to_ev*1E3
+                # Check if finite temperature
+                if temp_target:
+                    temp_index = self.find_temp_index(qptcont.temp, temp_target)
+                    self.zpr_qpt = qptcont.reduced_tdr_qpt[0, kpt_index, self.band_index[n], temp_index,:]*ha_to_ev*1E3
+
+                else:
+                    # get data
+                    self.zpr_qpt = qptcont.reduced_zpr_qpt[0, kpt_index, self.band_index[n], :]*ha_to_ev*1E3
                 self.qpoints = qptcont.qpoints
                 self.nqpt = qptcont.nqpt
                 if self.nqpt is None:
@@ -236,24 +254,50 @@ class QptContribution(object):
                 self.get_qpt_norm()
 
                 if self.mode:
-                    self.zpr_mode_qpt = qptmode.reduced_zpr_qpt_mode[0, kpt_index, self.band_index[n], :, :]*ha_to_ev*1E3
+                    if temp_target:
+                        temp_index = self.find_temp_index(qptmode.temp, temp_target)
+                        self.zpr_mode_qpt = qptmode.reduced_tdr_qpt_mode[0, kpt_index, self.band_index[n], temp_index, :, :]*ha_to_ev*1E3
+                    else:
+                        self.zpr_mode_qpt = qptmode.reduced_zpr_qpt_mode[0, kpt_index, self.band_index[n], :, :]*ha_to_ev*1E3
                     self.split_modes()
 
                 if self.mode:
                     if n == 0:
-                        if self.cumulative:
-                            # Add the if not self.bz_weight
-                            fig, ax = plt.subplots(3, 1, squeeze=True, sharex=True, figsize=self.figsize)
-                        else:
-                            fig = plt.figure(figsize=self.figsize)
-                            spec = gridspec.GridSpec(ncols=1, nrows=3, figure=fig)
-                            if not self.bz_weight:
-                                ax = [fig.add_subplot(spec[0:2, 0])]
+                        if self.separate_mode_histograms:
+                            if self.cumulative:
+                                # Add the if not self.bz_weight
+                                fig, ax = plt.subplots(5, 2, squeeze=False, sharex=True, figsize=self.figsize)
+                                ax[4, 1].set_visible(False)
                             else:
-                                ax = [fig.add_subplot(spec[0:2, 0]),  fig.add_subplot(spec[2, 0])]
-    #                        fig, ax = plt.subplots(2, 1, squeeze=True, sharex=True, figsize=self.figsize)
-                        self.ref_zpr = np.sum(self.zpr_qpt)
-                    self.plot_qpt_mode_contribution(n, ax)
+                                fig = plt.figure(figsize=self.figsize)
+                                spec = gridspec.GridSpec(ncols=1, nrows=9, figure=fig)
+                                if not self.bz_weight:
+                                    ax = [fig.add_subplot(spec[0:2, 0]), fig.add_subplot(spec[2:4, 0]),
+                                            fig.add_subplot(spec[4:6, 0]), fig.add_subplot(spec[6:8, 0])]
+                                else:
+                                    ax = [fig.add_subplot(spec[0:2, 0]), fig.add_subplot(spec[2:4, 0]), fig.add_subplot(spec[4:6, 0]),
+                                            fig.add_subplot(spec[6:8, 0]), fig.add_subplot(spec[8, 0])]
+        #                        fig, ax = plt.subplots(2, 1, squeeze=True, sharex=True, figsize=self.figsize)
+                            self.ref_zpr = np.sum(self.zpr_qpt)
+                        else:
+                            if self.cumulative:
+                                # Add the if not self.bz_weight
+                                fig, ax = plt.subplots(3, 1, squeeze=True, sharex=True, figsize=self.figsize)
+                            else:
+                                fig = plt.figure(figsize=self.figsize)
+                                spec = gridspec.GridSpec(ncols=1, nrows=3, figure=fig)
+                                if not self.bz_weight:
+                                    ax = [fig.add_subplot(spec[0:2, 0])]
+                                else:
+                                    ax = [fig.add_subplot(spec[0:2, 0]),  fig.add_subplot(spec[2, 0])]
+        #                        fig, ax = plt.subplots(2, 1, squeeze=True, sharex=True, figsize=self.figsize)
+                            self.ref_zpr = np.sum(self.zpr_qpt)
+
+                    if self.separate_mode_histograms:
+                        self.plot_qpt_mode_contribution_separate(n, ax)
+                    else:
+                        self.plot_qpt_mode_contribution(n, ax)
+
                 else:
                     if n == 0:
                         if self.cumulative:
@@ -456,14 +500,62 @@ class QptContribution(object):
             # No culumative histogram
     #        ax.plot(self.qpt_norm, self.zpr_qpt, 'o')
             # ZPR contribution
-            ax[0].hist(self.qpt_norm, bins=50, weights=self.zpr_qpt, histtype='stepfilled', linewidth=1.5, stacked=True,
-                       color=self.color[0], linestyle = self.linestyle[n],alpha=alpha[n], zorder=n)
-            ax[0].hist(self.qpt_norm, bins=50, weights=self.lo, histtype='stepfilled', linewidth=1.5, stacked=True, 
-                       color=self.color[3], linestyle = self.linestyle[n],alpha=alpha[n], zorder=2+n)
-            ax[0].hist(self.qpt_norm, bins=50, weights=self.acoustic, histtype='stepfilled', linewidth=1.5, stacked=True,
-                       color=self.color[1], linestyle = self.linestyle[n],alpha=alpha[n], zorder=6+n)
-            ax[0].hist(self.qpt_norm, bins=50, weights=self.to, histtype='stepfilled', linewidth=1.5, stacked=True,
-                       color=self.color[2], linestyle = self.linestyle[n],alpha=alpha[n], zorder=4+n)
+            nbins=50
+            hatch = ['////']
+
+            # Only to add inset axes...
+
+            if self.histogram_is_filled:
+                ax[0].hist(self.qpt_norm, bins=nbins, weights=self.zpr_qpt, histtype='stepfilled', linewidth=1.5, stacked=True,
+                           color=self.color[0], linestyle = self.linestyle[n],alpha=alpha[n], zorder=n)
+                ax[0].hist(self.qpt_norm, bins=nbins, weights=self.lo, histtype='stepfilled', linewidth=1.5, stacked=True, 
+                           color=self.color[3], linestyle = self.linestyle[n],alpha=alpha[n], zorder=2+n)
+                ax[0].hist(self.qpt_norm, bins=nbins, weights=self.acoustic, histtype='stepfilled', linewidth=1.5, stacked=True,
+                           color=self.color[1], linestyle = self.linestyle[n],alpha=alpha[n], zorder=6+n)
+                ax[0].hist(self.qpt_norm, bins=nbins, weights=self.to, histtype='stepfilled', linewidth=1.5, stacked=True,
+                           color=self.color[2], linestyle = self.linestyle[n],alpha=alpha[n], zorder=4+n)
+
+                if inset:
+                    print(n, alpha[n])
+
+                    axins_large.hist(self.qpt_norm, bins=nbins, weights=self.zpr_qpt, histtype='stepfilled', linewidth=1.5, stacked=True,
+                               color=self.color[0], linestyle = self.linestyle[n],alpha=alpha[n], zorder=2*n)
+                    axins_large.hist(self.qpt_norm, bins=nbins, weights=self.lo, histtype='stepfilled', linewidth=1.5, stacked=True, 
+                               color=self.color[3], linestyle = self.linestyle[n],alpha=alpha[n], zorder=2+2*n)
+                    axins_large.hist(self.qpt_norm, bins=nbins, weights=self.acoustic, histtype='stepfilled', linewidth=1.5, stacked=True,
+                               color=self.color[1], linestyle = self.linestyle[n],alpha=alpha[n], zorder=6+2*n)
+                    axins_large.hist(self.qpt_norm, bins=nbins, weights=self.to, histtype='stepfilled', linewidth=1.5, stacked=True,
+                               color=self.color[2], linestyle = self.linestyle[n],alpha=alpha[n], zorder=4+2*n)
+
+
+                # To add hatch
+                if n==0:
+                    ax[0].hist(self.qpt_norm, bins=nbins, weights=self.zpr_qpt, histtype='step', linewidth=1.5, stacked=True,
+                               color=self.color[0], linestyle = 'None',hatch='////', zorder=n)
+                    ax[0].hist(self.qpt_norm, bins=nbins, weights=self.lo, histtype='step', linewidth=1.5, stacked=True, 
+                               color=self.color[3], linestyle = 'None',hatch='////', zorder=2+n)
+                    ax[0].hist(self.qpt_norm, bins=nbins, weights=self.acoustic, histtype='step', linewidth=1.5, stacked=True,
+                               color=self.color[1], linestyle = 'None',hatch='////', zorder=6+n)
+                    ax[0].hist(self.qpt_norm, bins=nbins, weights=self.to, histtype='step', linewidth=1.5, stacked=True,
+                               color=self.color[2], linestyle = 'None',hatch='////', zorder=4+n)
+
+                if inset:
+                    #axins_large.set_xlim([0.4,0.95])
+                    print(ax[0].get_ylim())
+                    #axins_large.set_ylim([-0.01,0.2])
+#                    mark_inset(ax[0], axins_large, loc1=2, loc2=4, fc="none", ec="0.5")
+
+
+            else:
+                ax[0].hist(self.qpt_norm, bins=nbins, weights=self.zpr_qpt, histtype='step', linewidth=1.5, stacked=True,
+                           color=self.color[0], linestyle = self.linestyle[n],alpha=alpha[n], zorder=n)
+                ax[0].hist(self.qpt_norm, bins=nbins, weights=self.lo, histtype='step', linewidth=1.5, stacked=True, 
+                           color=self.color[3], linestyle = self.linestyle[n],alpha=alpha[n], zorder=2+n)
+                ax[0].hist(self.qpt_norm, bins=nbins, weights=self.acoustic, histtype='step', linewidth=1.5, stacked=True,
+                           color=self.color[1], linestyle = self.linestyle[n],alpha=alpha[n], zorder=6+n)
+                ax[0].hist(self.qpt_norm, bins=nbins, weights=self.to, histtype='step', linewidth=1.5, stacked=True,
+                           color=self.color[2], linestyle = self.linestyle[n],alpha=alpha[n], zorder=4+n)
+
             # This is just to outline the LO for Ge...
             #ax[0].hist(self.qpt_norm, bins=50, weights=self.lo, histtype='step', linewidth=1.5, stacked=True, 
             #           color=self.color[3], linestyle = self.linestyle[n],alpha=alpha[n], zorder=8+n)
@@ -536,10 +628,10 @@ class QptContribution(object):
 #            ax[0].text(0.10, 0.92, r'change of $m^\ast$', fontsize=20)
 #            ax[0].text(0.52, 0.51, r'global $\varepsilon_{\mathbf{k}n}$ reduction', fontsize=20)
             # For CdS
-            ax[0].annotate('',xy=(0.15,2.20), xycoords='data', xytext=(0.20, 2.50),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
-            ax[0].annotate('',xy=(0.70,0.63), xycoords='data', xytext=(0.70, 1.20),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
-            ax[0].text(0.10, 2.58, r'change of $m^\ast$', fontsize=20)
-            ax[0].text(0.52, 1.23, r'global $\varepsilon_{\mathbf{k}n}$ reduction', fontsize=20)
+#            ax[0].annotate('',xy=(0.15,2.20), xycoords='data', xytext=(0.20, 2.50),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
+#            ax[0].annotate('',xy=(0.70,0.63), xycoords='data', xytext=(0.70, 1.20),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
+#            ax[0].text(0.10, 2.58, r'change of $m^\ast$', fontsize=20)
+#            ax[0].text(0.52, 1.23, r'global $\varepsilon_{\mathbf{k}n}$ reduction', fontsize=20)
 
             self.set_hist_labels(ax)
 
@@ -615,6 +707,7 @@ class QptContribution(object):
                     ax[0].plot(np.linspace(xlim[0], xlim[1], 10), np.zeros((10)), 'k', zorder=-1, linewidth=0.75)
                     ax[0].set_xlim(xlim[0], xlim[1])
                     ax[0].tick_params(axis='both', labelsize=14)
+#                    ax[0].set_ylim(-0.08, 1.66) # REMOVE ME
 
                 if self.title:
                     plt.suptitle(self.title, fontsize=20)
@@ -630,6 +723,206 @@ class QptContribution(object):
                     os.system('open {}_qpt.pdf'.format(self.savefig))
                 else:
                     plt.show()
+
+    def plot_qpt_mode_contribution_separate(self, n, ax):
+
+        alpha = [0.6, 1.0]
+        # Plot all mode histograms in different panels
+        if self.cumulative:
+            # Add if not bz_weight:
+    #        ax.plot(self.qpt_norm, self.zpr_qpt, 'o')
+            # ZPR contribution
+            ax[0, 0].hist(self.qpt_norm, bins=50, weights=self.zpr_qpt, histtype='step', linewidth=1.5, stacked=True,
+                       color=self.color[0], linestyle = self.linestyle[n])
+            ax[3, 0].hist(self.qpt_norm, bins=50, weights=self.acoustic, histtype='step', linewidth=1.5, stacked=True,
+                       color=self.color[1], linestyle = self.linestyle[n])
+            ax[2, 0].hist(self.qpt_norm, bins=50, weights=self.to, histtype='step', linewidth=1.5, stacked=True,
+                       color=self.color[2], linestyle = self.linestyle[n])
+            ax[1, 0].hist(self.qpt_norm, bins=50, weights=self.lo, histtype='step', linewidth=1.5, stacked=True, 
+                       color=self.color[3], linestyle = self.linestyle[n])
+            histzpr, binszpr = self.get_histogram(self.zpr_qpt)
+            ax[0, 0].plot(binszpr[:-1], histzpr, 'r')
+            spl_hist = UnivariateSpline(bins[15:-1], histzpr, k=3)
+            xq = np.linspace(binszpr[15], binszpr[-1], 100)
+            ax[0, 0].plot(xq, spl_hist(xq), 'y', lw=3)
+            # CUmulative ZPR contribution
+    #        ax[1].hist(self.qpt_norm, bins=50, weights=self.zpr_qpt, cumulative=True, density=True,
+    #                   histtype='step', linewidth=1.5, color=self.color[0], linestyle = self.linestyle[n])
+            hist, bins = self.get_cumulative_histogram(self.zpr_qpt)
+            ax[0, 1].hist(bins[:-1], bins=bins, weights=hist, histtype='step', linewidth=1.5, color=self.color[0], linestyle = self.linestyle[n])
+            hist, bins = self.get_cumulative_histogram(self.acoustic)
+            ax[3, 1].hist(bins[:-1], bins=bins, weights=hist, histtype='step', linewidth=1.5, color=self.color[1], linestyle = self.linestyle[n])
+            hist, bins = self.get_cumulative_histogram(self.to)
+            ax[2, 1].hist(bins[:-1], bins=bins, weights=hist, histtype='step', linewidth=1.5, color=self.color[2], linestyle = self.linestyle[n])
+            hist, bins = self.get_cumulative_histogram(self.lo)
+            ax[1, 1].hist(bins[:-1], bins=bins, weights=hist, histtype='step', linewidth=1.5, color=self.color[3], linestyle = self.linestyle[n])
+
+
+            # Qpoint density
+            hist, bins = self.get_bz_histogram()  # FIX ME : this does not work very well.... should be removed
+
+    #        sns.histplot(x=self.qpt_norm, weights=self.wtq, bins=50, ax=ax[2], color='gray', element='step', fill=False, 
+    #                     kde=True, kde_kws={'cut':0}, line_kws={'color':'r'})
+    #        sns.histplot(x=bins[:-1], weights=hist, bins=50, ax=ax[2], color='gray', element='step', fill=False, 
+    #                     kde=True, kde_kws={'cut':0}, line_kws={'color':'r'})
+
+            histbz, bins = self.get_histogram(self.wtq)
+            line = sns.histplot(x=self.qpt_norm, weights=self.wtq, bins=50,kde=True).get_lines()[0].get_data()
+            ax[4,0].clear()
+            ax[4,0].plot(line[0], line[1], 'r')
+
+            # extend histogram data to the same lenght as the kde
+            longhist = np.zeros((200))
+            longhistzpr = np.zeros((200))
+            for i in range(50):
+                longhistzpr[4*i:4*(i+1)] = histzpr[i]
+                longhist[4*i:4*(i+1)] = histbz[i]
+            longcorr = line[1]/longhist
+            corr = line[1][::4]/histbz
+            ax[0, 0].plot(bins[:-1], corr*histzpr, 'g')
+            ax[0, 0].plot(line[0], longcorr*longhistzpr, 'm')
+
+            sns.kdeplot(x=self.qpt_norm, weights=self.wtq, ax=ax[2], color=self.color[0], linestyle='solid', fill=False, cut=0)
+    #        ax[2].hist(self.qpt_norm, bins=50, weights=self.wtq, histtype='step', linewidth=5.0, color=self.color[0], linestyle = self.linestyle[n])
+            #self.shade_lowq(ax, 0.2)
+    #        print(len(sns.histplot(x=self.qpt_norm, weights=self.wtq, bins=50,kde=True).get_lines()))
+
+    #        print(ax[1].get_ylim())
+            xlim = ax[0, 0].get_xlim()
+            ax[0, 0].plot(np.linspace(xlim[0], xlim[1], 10), np.zeros((10)), 'k', zorder=-1, linewidth=0.75)
+            for i in range(3):
+                ax[i].set_xlim(xlim[0], xlim[1])
+
+    #        ax[0].set_ylim(-0.1, 1.505)
+            ax[1, 0].set_ylim(0.0, 1.05)
+
+        else:
+            # No culumative histogram
+    #        ax.plot(self.qpt_norm, self.zpr_qpt, 'o')
+            # ZPR contribution
+            nbins=50
+
+            if self.histogram_is_filled:
+                ax[0].hist(self.qpt_norm, bins=nbins, weights=self.zpr_qpt, histtype='stepfilled', linewidth=1.5, stacked=True,
+                           color=self.color[0], linestyle = self.linestyle[n],alpha=alpha[n], zorder=n)
+                ax[1].hist(self.qpt_norm, bins=nbins, weights=self.lo, histtype='stepfilled', linewidth=1.5, stacked=True, 
+                           color=self.color[3], linestyle = self.linestyle[n],alpha=alpha[n], zorder=2+n)
+                ax[3].hist(self.qpt_norm, bins=nbins, weights=self.acoustic, histtype='stepfilled', linewidth=1.5, stacked=True,
+                           color=self.color[1], linestyle = self.linestyle[n],alpha=alpha[n], zorder=6+n)
+                ax[2].hist(self.qpt_norm, bins=nbins, weights=self.to, histtype='stepfilled', linewidth=1.5, stacked=True,
+                           color=self.color[2], linestyle = self.linestyle[n],alpha=alpha[n], zorder=4+n)
+            else:
+                ax[0].hist(self.qpt_norm, bins=nbins, weights=self.zpr_qpt, histtype='step', linewidth=1.5, stacked=True,
+                           color=self.color[0], linestyle = self.linestyle[n],alpha=alpha[n], zorder=n)
+                ax[1].hist(self.qpt_norm, bins=nbins, weights=self.lo, histtype='step', linewidth=1.5, stacked=True, 
+                           color=self.color[3], linestyle = self.linestyle[n],alpha=alpha[n], zorder=2+n)
+                ax[3].hist(self.qpt_norm, bins=nbins, weights=self.acoustic, histtype='step', linewidth=1.5, stacked=True,
+                           color=self.color[1], linestyle = self.linestyle[n],alpha=alpha[n], zorder=6+n)
+                ax[2].hist(self.qpt_norm, bins=nbins, weights=self.to, histtype='step', linewidth=1.5, stacked=True,
+                           color=self.color[2], linestyle = self.linestyle[n],alpha=alpha[n], zorder=4+n)
+
+            # This is just to outline the LO for Ge...
+            #ax[0].hist(self.qpt_norm, bins=50, weights=self.lo, histtype='step', linewidth=1.5, stacked=True, 
+            #           color=self.color[3], linestyle = self.linestyle[n],alpha=alpha[n], zorder=8+n)
+
+            histzpr, binszpr = self.get_histogram(self.zpr_qpt)
+      #      ax[0].plot(binszpr[:-1], histzpr, 'r')
+#            spl_hist = UnivariateSpline(binszpr[15:-1], histzpr[15:], k=4)
+#            xq = np.linspace(binszpr[15], binszpr[-1], 100)
+#            ax[0].plot(xq, spl_hist(xq), 'y', lw=3)
+            # CUmulative ZPR contribution
+
+            if self.bz_weight:
+                # Qpoint density
+                hist, bins = self.get_bz_histogram()  # FIX ME : this does not work very well.... should be removed
+
+                line = sns.histplot(x=self.qpt_norm, weights=self.wtq, bins=50, ax=ax[4], color='gray', element='step', fill=True, 
+                              kde=True, kde_kws={'cut':0}).get_lines()[0].get_data()
+        #        sns.histplot(x=bins[:-1], weights=hist, bins=50, ax=ax[2], color='gray', element='step', fill=False, 
+        #                     kde=True, kde_kws={'cut':0}, line_kws={'color':'r'})
+
+                histbz, bins = self.get_histogram(self.wtq)
+                if self.verbose:
+                    print('histbz sum (should be very close to 1):', np.sum(histbz))
+    #            line = sns.histplot(x=self.qpt_norm, weights=self.wtq, bins=50,kde=True).get_lines()[0].get_data()
+          #      ax[1].clear()
+                ax[4].plot(line[0], line[1], 'k', linewidth=1.5)
+        #        ax[1].plot(bins[15], histbz[15],'ok')
+                # extend histogram data to the same lenght as the kde
+    #            longhist = np.zeros((200))
+    #            longhistzpr = np.zeros((200))
+    #            for i in range(50):
+    #                longhistzpr[4*i:4*(i+1)] = histzpr[i]
+    #                longhist[4*i:4*(i+1)] = histbz[i]
+    #            longcorr = line[1]/longhist
+    #            corr = line[1][::4]/histbz
+        #        ax[0].plot(binszpr[:-1], corr*histzpr, 'g')
+    #            ax[0].plot(line[0], longcorr*longhistzpr, 'm')
+
+    #            sns.kdeplot(x=self.qpt_norm, weights=self.wtq, ax=ax[1], color=self.color[0], linestyle='solid', fill=False, cut=0)
+        #        ax[2].hist(self.qpt_norm, bins=50, weights=self.wtq, histtype='step', linewidth=5.0, color=self.color[0], linestyle = self.linestyle[n])
+                #self.shade_lowq(ax, 0.2)
+        #        print(len(sns.histplot(x=self.qpt_norm, weights=self.wtq, bins=50,kde=True).get_lines()))
+
+        #        print(ax[1].get_ylim())
+                #xlim = ax[0].get_xlim()
+            xlim = [0,1]
+            ylim = ax[0].get_ylim()
+            print('ylim=', ylim)
+            for iax in range(4):
+                ax[iax].plot(np.linspace(xlim[0], xlim[1], 10), np.zeros((10)), 'k', zorder=-1, linewidth=0.75)
+            if self.bz_weight:
+                for i in range(5):
+                    ax[i].set_xlim(xlim[0], xlim[1])
+                    ax[i].tick_params(axis='both', labelsize=12)
+                    ax[4].xaxis.set_major_formatter(FormatStrFormatter('%.1f')) 
+                    if i<4:
+                        ax[i].yaxis.set_major_formatter(FormatStrFormatter('%.1f')) 
+                        ax[i].set_ylim(ylim)
+                        ax[i].xaxis.set_visible(False)
+                ax[4].yaxis.set_major_formatter(FormatStrFormatter('%.2f')) 
+
+            else:
+                for i in range(4):
+                    ax[i].set_xlim(xlim[0], xlim[1])
+                    ax[i].tick_params(axis='both', labelsize=12)
+                    ax[i].xaxis.set_major_formatter(FormatStrFormatter('%.1f')) 
+                    ax[i].yaxis.set_major_formatter(FormatStrFormatter('%.1f')) 
+
+#            ax[0].set_ylim(-0.1, 1.505)
+
+        if n+1  == self.nfile:
+
+            # For CdTe
+#            ax[0].annotate('',xy=(0.15,0.70), xycoords='data', xytext=(0.20, 0.90),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
+#            ax[0].annotate('',xy=(0.70,0.30), xycoords='data', xytext=(0.70, 0.50),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
+#            ax[0].text(0.10, 0.92, r'change of $m^\ast$', fontsize=20)
+#            ax[0].text(0.52, 0.51, r'global $\varepsilon_{\mathbf{k}n}$ reduction', fontsize=20)
+            # For CdS
+#            ax[0].annotate('',xy=(0.15,2.20), xycoords='data', xytext=(0.20, 2.50),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
+#            ax[0].annotate('',xy=(0.70,0.63), xycoords='data', xytext=(0.70, 1.20),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
+#            ax[0].text(0.10, 2.58, r'change of $m^\ast$', fontsize=20)
+#            ax[0].text(0.52, 1.23, r'global $\varepsilon_{\mathbf{k}n}$ reduction', fontsize=20)
+
+            self.set_hist_labels(ax)
+
+            self.set_legend(ax)
+            
+            if self.title:
+                plt.suptitle(self.title, fontsize=20)
+
+            if self.bz_weight:
+                plt.subplots_adjust(hspace=0.07, top=0.95)
+            else:
+                plt.subplots_adjust(top=0.3)
+
+
+            if self.savefig:
+                plt.savefig('{}_qpt_mode.pdf'.format(self.savefig), dpi=1200, bbox_inches='tight')
+                os.system('open {}_qpt_mode.pdf'.format(self.savefig))
+            else:
+                plt.show()
+
 
     def plot_qpt_contribution_ratio(self, n, ax):
 
@@ -774,7 +1067,7 @@ class QptContribution(object):
                 # CdTe
                 #ax[1].plot(np.linspace(xlim[0], xlim[1], 10), 0.695*np.ones((10)), 'k', zorder=-1, linewidth=0.75, linestyle='dashed')
                 # CdS
-                ax[1].plot(np.linspace(xlim[0], xlim[1], 10), 0.963*np.ones((10)), 'k', zorder=-1, linewidth=0.75, linestyle='dashed')
+                #ax[1].plot(np.linspace(xlim[0], xlim[1], 10), 0.963*np.ones((10)), 'k', zorder=-1, linewidth=0.75, linestyle='dashed')
 
 
 
@@ -797,11 +1090,11 @@ class QptContribution(object):
 #            ax[1].text(0.90, 0.73, r'R=0.695', fontsize=12)
 
             # For CdS
-            ax[0].annotate('',xy=(0.15,2.20), xycoords='data', xytext=(0.20, 2.50),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
-            ax[0].annotate('',xy=(0.70,0.63), xycoords='data', xytext=(0.70, 1.20),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
-            ax[0].text(0.10, 2.58, r'change of $m^\ast$', fontsize=20)
-            ax[0].text(0.52, 1.23, r'global $\varepsilon_{kn}$ reduction', fontsize=20)
-            ax[1].text(0.75, 0.85, r'R=0.963', fontsize=12)
+#            ax[0].annotate('',xy=(0.15,2.20), xycoords='data', xytext=(0.20, 2.50),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
+#            ax[0].annotate('',xy=(0.70,0.63), xycoords='data', xytext=(0.70, 1.20),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
+#            ax[0].text(0.10, 2.58, r'change of $m^\ast$', fontsize=20)
+#            ax[0].text(0.52, 1.23, r'global $\varepsilon_{kn}$ reduction', fontsize=20)
+#            ax[1].text(0.75, 0.85, r'R=0.963', fontsize=12)
 
             if self.title:
                 plt.suptitle(self.title, fontsize=20)
@@ -821,45 +1114,89 @@ class QptContribution(object):
     def set_hist_labels(self, ax):
 
         fs = 18
-        if self.cumulative:
-            # Add if not self.bz_weight
-            ax[2].set_xlabel(r'Q-point norm ($\frac{2\pi}{a}$)', fontsize=fs)
-            if self.ratio:
-                ax[0].set_ylabel(r'Ratio of contribution to ZPR SOC/noSOC', fontsize=fs)
-            else:
-                ax[0].set_ylabel(r'Contribution to ZPR (meV)', fontsize=fs)
-
-            if self.flist_labels and not self.ratio:
-                ax[1].set_ylabel(r'Cumulative contribution\\to ZPR / Total ZPR ({})'.format(self.flist_labels[0]), fontsize=12)
-            else:
-                ax[1].set_ylabel(r'Cumulative contribution\\to ZPR / Total ZPR', fontsize=fs)
-
-    #        ax[2].set_ylabel(r'Number of q-points', fontsize=fs)
-            ax[2].set_ylabel(r'BZ weight', fontsize=fs)
-
-    #        ax[0].set_title(r'Contribution to ZPR vs $\vert q\vert$', fontsize=12)
-    #        ax[1].set_title(r'Cumulative contribution vs $\vert q\vert$', fontsize=12)
-    #        ax[2].set_title(r'Q-point distribution', fontsize=12)
-        else:
-            if self.ratio_with_mode:
-                if not self.bz_weight:
-                    ax[1].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
+        if self.separate_mode_histograms:
+            if self.cumulative:
+                # Add if not self.bz_weight
+                ax[4, 0].set_xlabel(r'Q-point norm ($\frac{2\pi}{a}$)', fontsize=fs)
+                if self.ratio:
+                    ax[0, 0].set_ylabel(r'Ratio of contribution to ZPR SOC/noSOC', fontsize=fs)
                 else:
-                    ax[2].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
-                    ax[2].set_ylabel(r'BZ weight', fontsize=fs)
-                ax[1].set_ylabel(r'SOC/noSOC', fontsize=fs, labelpad=10)
-                ax[0].set_ylabel(r'Contribution to ZPR (meV)', fontsize=fs, labelpad=10)
+                    ax[0, 0].set_ylabel(r'Contribution to ZPR (meV)', fontsize=fs)
+                ax[0, 0].yaxis.set_label_coords(-0.1, 0.5)
+
+                if self.flist_labels and not self.ratio:
+                    ax[0, 1].set_ylabel(r'Cumulative contribution\\to ZPR / Total ZPR ({})'.format(self.flist_labels[0]), fontsize=12)
+                else:
+                    ax[0, 1].set_ylabel(r'Cumulative contribution\\to ZPR / Total ZPR', fontsize=fs)
+
+        #        ax[2].set_ylabel(r'Number of q-points', fontsize=fs)
+                ax[4, 0].set_ylabel(r'BZ weight', fontsize=fs)
+
+        #        ax[0].set_title(r'Contribution to ZPR vs $\vert q\vert$', fontsize=12)
+        #        ax[1].set_title(r'Cumulative contribution vs $\vert q\vert$', fontsize=12)
+        #        ax[2].set_title(r'Q-point distribution', fontsize=12)
             else:
+#                if self.ratio_with_mode:
+#                    if not self.bz_weight:
+#                        ax[1].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
+#                    else:
+#                        ax[2].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
+#                        ax[2].set_ylabel(r'BZ weight', fontsize=fs)
+#                    ax[1].set_ylabel(r'SOC/noSOC', fontsize=fs, labelpad=10)
+#                    ax[0].set_ylabel(r'Contribution to ZPR (meV)', fontsize=fs, labelpad=10)
+#                else:
                 if not self.bz_weight:
                     ax[0].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
                 else:
-                    ax[1].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
-                    ax[1].set_ylabel(r'BZ weight', fontsize=fs)
+                    ax[4].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
+                    ax[4].set_ylabel(r'BZ weight', fontsize=fs)
                 if self.ratio:
                     ax[0].set_ylabel(r'Ratio of contribution to ZPR SOC/noSOC', fontsize=fs)
-
                 else:
                     ax[0].set_ylabel(r'Contribution to ZPR (meV)', fontsize=fs)
+                ax[0].yaxis.set_label_coords(-0.05, -1.0)
+
+
+        else:
+            if self.cumulative:
+                # Add if not self.bz_weight
+                ax[2].set_xlabel(r'Q-point norm ($\frac{2\pi}{a}$)', fontsize=fs)
+                if self.ratio:
+                    ax[0].set_ylabel(r'Ratio of contribution to ZPR SOC/noSOC', fontsize=fs)
+                else:
+                    ax[0].set_ylabel(r'Contribution to ZPR (meV)', fontsize=fs)
+
+                if self.flist_labels and not self.ratio:
+                    ax[1].set_ylabel(r'Cumulative contribution\\to ZPR / Total ZPR ({})'.format(self.flist_labels[0]), fontsize=12)
+                else:
+                    ax[1].set_ylabel(r'Cumulative contribution\\to ZPR / Total ZPR', fontsize=fs)
+
+        #        ax[2].set_ylabel(r'Number of q-points', fontsize=fs)
+                ax[2].set_ylabel(r'BZ weight', fontsize=fs)
+
+        #        ax[0].set_title(r'Contribution to ZPR vs $\vert q\vert$', fontsize=12)
+        #        ax[1].set_title(r'Cumulative contribution vs $\vert q\vert$', fontsize=12)
+        #        ax[2].set_title(r'Q-point distribution', fontsize=12)
+            else:
+                if self.ratio_with_mode:
+                    if not self.bz_weight:
+                        ax[1].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
+                    else:
+                        ax[2].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
+                        ax[2].set_ylabel(r'BZ weight', fontsize=fs)
+                    ax[1].set_ylabel(r'SOC/noSOC', fontsize=fs, labelpad=10)
+                    ax[0].set_ylabel(r'Contribution to ZPR (meV)', fontsize=fs, labelpad=10)
+                else:
+                    if not self.bz_weight:
+                        ax[0].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
+                    else:
+                        ax[1].set_xlabel(r'$\mathbf{q}$-point norm $q$ ($\frac{2\pi}{a}$)', fontsize=fs)
+                        ax[1].set_ylabel(r'BZ weight', fontsize=fs)
+                    if self.ratio:
+                        ax[0].set_ylabel(r'Ratio of contribution to ZPR SOC/noSOC', fontsize=fs)
+
+                    else:
+                        ax[0].set_ylabel(r'Contribution to ZPR (meV)', fontsize=fs)
 
     #        ax[2].set_ylabel(r'Number of q-points', fontsize=12)
 
@@ -873,11 +1210,33 @@ class QptContribution(object):
     def set_legend(self, ax):
 
         handles = []
+
+        if self.separate_mode_histograms:
+            labels = ['Total', 'Acoustic', 'TO', 'LO']
+            ax_order = [0, 3, 2, 1]
+
+            for i in range(4):
+                handle = [Line2D([0], [0], linewidth=4.0, color=self.color[i], label=labels[i])]
+                artist = ax[ax_order[i]].legend(handles=handle, loc='upper right', fontsize=16)
+                ax[ax_order[i]].add_artist(artist)
+
+            if self.nfile > 1 and self.flist_labels:
+                handles = []
+                alpha = [0.4, 1.0]
+                for i in range(self.nfile):
+                    #handles.append(Line2D([0], [0], linewidth=3.0, color='k', label=self.flist_labels[i], linestyle='solid', alpha=alpha[i]))
+                    handles.append(Patch(edgecolor='None', facecolor='k', alpha=alpha[i], label=self.flist_labels[i], linewidth=4.0))
+                    #[Patch(edgecolor='k', facecolor='k', hatch='///', label=r'Ce-$f$')]
+
+                artist2 = ax[0].legend(handles=handles, loc='upper center', ncol=2, fontsize=16, handlelength=1.0,
+                                handletextpad=0.5)
+
+            return
+
         if self.mode or self.ratio_with_mode:
             labels = ['Total', 'Acoustic', 'TO', 'LO']
             for i in range(4):
                 handles.append(Line2D([0], [0], linewidth=4.0, color=self.color[i], label=labels[i]))
-
             if self.cumulative:
                 artist = ax.legend(handles=handles, loc=8, bbox_to_anchor=(0.62, 0.75), ncol=4, fontsize=12)
                 ax.add_artist(artist)
@@ -905,10 +1264,20 @@ class QptContribution(object):
                 handles = []
                 alpha = [0.4, 1.0]
                 for i in range(self.nfile):
+                    hatch = ['////', '']
                     if self.mode or self.ratio_with_mode:
+
                         #handles.append(Line2D([0], [0], linewidth=3.0, color='k', label=self.flist_labels[i], linestyle='solid', alpha=alpha[i]))
-                        handles.append(Patch(edgecolor='None', facecolor='k', alpha=alpha[i], label=self.flist_labels[i], linewidth=4.0))
+                        # for alpha
+                        #handles.append(Patch(edgecolor='None', facecolor='k', alpha=alpha[i], label=self.flist_labels[i], linewidth=4.0))
+                        # for hatch
+                        #handles.append(Patch(edgecolor='k', facecolor='None', hatch=hatch[i], label=self.flist_labels[i], linewidth=1.0))
                         #[Patch(edgecolor='k', facecolor='k', hatch='///', label=r'Ce-$f$')]
+                        # original one
+                        #artist = ax.legend(handles=handles, loc=8, bbox_to_anchor=(0.60, 0.85), ncol=4, fontsize=16,
+                        #                   columnspacing=1.1, handlelength=1.5)
+                        #ax.add_artist(artist)
+
                     else:
                         handles.append(Line2D([0], [0], linewidth=3.0, color=self.color[i], label=self.flist_labels[i], linestyle=self.linestyle[i]))
 
@@ -918,14 +1287,45 @@ class QptContribution(object):
                 else:
                     # Main paper, no modes, 5 histograms
                     #artist2 = ax.legend(handles=handles, loc=8, bbox_to_anchor=(0.835, 0.53), ncol=1, handlelength=2.5, fontsize=16)
+
                     # Main paper, CdTe and CdS
-                    artist2 = ax.legend(handles=handles, loc=8, bbox_to_anchor=(0.892, 0.665), ncol=1, fontsize=16, handlelength=1.0,
-                                        handletextpad=0.5)
+
+                    # with alpha and linewidth=4.0
+                    #artist2 = ax.legend(handles=handles, loc=8, bbox_to_anchor=(0.892, 0.665), ncol=1, fontsize=16, handlelength=1.0,
+                    #                    handletextpad=0.5)
+                    # with hatch and linewidth=1.0
+                    #artist2 = ax.legend(handles=handles, loc=8, bbox_to_anchor=(0.887, 0.665), ncol=1, fontsize=16, handlelength=1.0,
+                    #                    handletextpad=0.5)
+                    # SOC and noSOC on the left of the legend ?
+
                     # SM, no modes, 9 histograms
                     #artist2 = ax.legend(handles=handles, loc=8, bbox_to_anchor=(0.635, 0.565),
-#                                        ncol=2, handlelength=2.5, fontsize=14, columnspacing=1.5)
+                    #                    ncol=2, handlelength=2.5, fontsize=14, columnspacing=1.5)
+                    # SM, no modes, compare 1 at a time 
+#                    artist2 = ax.legend(handles=handles, loc='upper right',
+#                                        ncol=1, handlelength=2.5, fontsize=14, columnspacing=1.5)
+                    #ax.text(-0.1, 1.66, r'c)', fontsize=22, clip_on=False)
+                    #artist2 = ax.legend(handles=handles, loc='upper center', frameon=False,
+                    #                    bbox_to_anchor=(0.8, 0.99), 
+                    #                    ncol=1, handlelength=2.5, fontsize=14, columnspacing=1.5)
 
-                ax.add_artist(artist2)
+
+# This is some testing for keeping the legend labels and frame still while plotting overlays
+#                    artist3 = ax.legend(handles=handles[0:2], loc='upper center', frameon=False,
+#                                        bbox_to_anchor=(0.78, 0.99), labelcolor = 'blue',
+#                                        ncol=1, handlelength=2.5, fontsize=14, columnspacing=1.5)
+#                    artist3 = ax.legend(handles=handles[0:3], loc='upper center', frameon=False,
+#                                        bbox_to_anchor=(0.8, 0.99), labelcolor = 'blue',
+#                                        ncol=1, handlelength=2.5, fontsize=14, columnspacing=1.5)
+
+                # Custom stuff for my defense
+                #ax.add_artist(artist2)
+                #rect= Rectangle((0.66,0.88), 0.275, 0.705, color='lightgray', fill=False)
+#                rect= Rectangle((0.66,1.06), 0.275, 0.580, color='lightgray', fill=False)
+                #ax.add_artist(rect)
+                #print('ylim:', ax.get_ylim())
+                #ax.set_ylim(-0.07919468259675438, 1.661518854133731)
+                #ax.text(0.08, 1.47, r'\textbf{CdTe}', fontsize=22)
 
     def get_cumulative_histogram(self, y):
 
@@ -952,6 +1352,14 @@ class QptContribution(object):
 
         return hist, bins
 
+    def find_temp_index(self, temp, target):
+
+        lst = list(temp) 
+
+        if target in lst:
+            return lst.index(target)
+        else:
+            raise Exception('I could not find T={}K in your file.'.format(target))
 
 class QptPathContribution(object):
 
@@ -1118,8 +1526,9 @@ class QptPathContribution(object):
     def plot_qpt_mode_contribution(self, n, ax):
 
         alpha = [0.6, 1.0]
-
+        
         if self.cumulative:
+       
     #        ax.plot(self.qpt_norm, self.zpr_qpt, 'o')
             # ZPR contribution
             ax[0].hist(self.qpt_norm, bins=50, weights=self.zpr_qpt, histtype='step', linewidth=1.5, stacked=True,
@@ -1187,6 +1596,7 @@ class QptPathContribution(object):
             ax[1].set_ylim(0.0, 1.05)
 
         else:
+
     #        ax.plot(self.qpt_norm, self.zpr_qpt, 'o')
             # ZPR contribution
             ax[0].hist(self.qpt_norm, bins=50, weights=self.zpr_qpt, histtype='stepfilled', linewidth=1.5, stacked=True,
@@ -1251,10 +1661,10 @@ class QptPathContribution(object):
 #            ax[0].text(0.10, 0.92, r'change of $m^\ast$', fontsize=20)
 #            ax[0].text(0.52, 0.51, r'global $\varepsilon_{kn}$ reduction', fontsize=20)
             # For CdS
-            ax[0].annotate('',xy=(0.15,2.20), xycoords='data', xytext=(0.20, 2.50),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
-            ax[0].annotate('',xy=(0.70,0.63), xycoords='data', xytext=(0.70, 1.20),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
-            ax[0].text(0.10, 2.58, r'change of $m^\ast$', fontsize=20)
-            ax[0].text(0.52, 1.23, r'global $\varepsilon_{kn}$ reduction', fontsize=20)
+#            ax[0].annotate('',xy=(0.15,2.20), xycoords='data', xytext=(0.20, 2.50),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
+#            ax[0].annotate('',xy=(0.70,0.63), xycoords='data', xytext=(0.70, 1.20),arrowprops=dict(color='k',headlength=12,headwidth=8,width=0.2))
+#            ax[0].text(0.10, 2.58, r'change of $m^\ast$', fontsize=20)
+#            ax[0].text(0.52, 1.23, r'global $\varepsilon_{kn}$ reduction', fontsize=20)
 
             self.set_hist_labels(ax)
 
@@ -1405,6 +1815,7 @@ def compute_contribution(
         qpt_weight=None,
         kpt_index=1,
         band_index=None,
+        temp_target=None,
 
         grid=True,
         path=False,
@@ -1416,6 +1827,8 @@ def compute_contribution(
         title=None,
         verbose=False,
         bz_weight=True,
+        histogram_is_filled=True,
+        separate_mode_histograms=False,
         figsize=(8, 8),
         
         *args, **kwargs):
@@ -1436,6 +1849,9 @@ def compute_contribution(
     ratio_with_mode = ratio_with_mode
     kpt_index = kpt_index-1
     bz_weight = bz_weight
+    temp_target = temp_target
+    histogram_is_filled = histogram_is_filled
+    separate_mode_histograms=separate_mode_histograms
 
     if not band_index:
         raise Exception('Must provide the band_index band index, starting at 1')
@@ -1453,7 +1869,7 @@ def compute_contribution(
             qptmode_farr=qptmode_farr,
 
             qpt_weight_fname=qpt_weight_fname,
-            aode=mode,
+            mode=mode,
             cumulative=cumulative,
             ratio=ratio,
             ratio_with_mode=ratio_with_mode,
@@ -1461,6 +1877,9 @@ def compute_contribution(
             kpt_index=kpt_index,
             band_index=band_index,
             bz_weight=bz_weight,
+            temp_target=temp_target,
+            histogram_is_filled=histogram_is_filled,
+            separate_mode_histograms=separate_mode_histograms,
 
             figsize=figsize,
             title=title,
@@ -1477,6 +1896,7 @@ def compute_contribution(
 
             kpt_index=kpt_index,
             band_index=band_index,
+            temp_target=temp_target,
 
             figsize=figsize,
             title=title,
