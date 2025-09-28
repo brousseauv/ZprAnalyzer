@@ -385,6 +385,7 @@ class ZPR_plotter(object):
     valence = None
     spline = False
     spline_factor = 5
+    q0_factor = None
     
     gap_loc0 = None
     gap_energy0 = None
@@ -496,6 +497,7 @@ class ZPR_plotter(object):
             savefile = None,
             spline_factor = 5,
             spline = False,
+            q0_factor = None,
 
             gap_loc0 = None,
             gap_energy0 = None,
@@ -629,6 +631,7 @@ class ZPR_plotter(object):
         self.read_correction_from_spline = read_correction_from_spline
         self.crossover = crossover
         self.diagram_together = diagram_together
+        self.q0_factor = q0_factor
 
         self.verbose = verbose
         self.zero_gap_value = zero_gap_value 
@@ -1935,7 +1938,10 @@ class ZPR_plotter(object):
 
                 else:
                     self.gap_ren = self.te.gap_renormalization + self.zpr.gap_renormalization
-                    self.zpr_ren = self.zpr.gap_renormalization
+                    self.zpr_ren = self.zpr.gap_renormalization 
+                    if self.q0_factor:
+                        self.zpr_ren -= 2*self.q0_factor*np.ones_like(self.zpr_ren)
+                        self.gap_ren -= 2*self.q0_factor*np.ones_like(self.gap_ren)
                     self.te_ren = self.te.gap_renormalization
 
 
@@ -1989,6 +1995,7 @@ class ZPR_plotter(object):
                         _arr[0][0].plot(self.expdata.xaxis, self.expdata.yaxis, marker='s', linestyle='None',color='black')
 
                     else:
+                        # Adjust units
                         # the only case I write for now is meV to eV. Add Hartree to eV later??
                         if self.gap_units == 'meV' and self.expdata.yaxis_units == 'eV':
 
@@ -2014,14 +2021,14 @@ class ZPR_plotter(object):
                                 shift_te = 0.
 
                             if self.split_zpr_te:
-                                _arr[0][0].plot(self.temp, self.zpr_ren*1E-3+shift_zpr, marker='o', linewidth=1.5, color=highcontrast['red'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                                _arr[0][0].plot(self.temp, self.te_ren*1E-3+shift_te, marker='o', linewidth=1.5, color=highcontrast['yellow'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
-                            _arr[0][0].plot(self.temp, self.gap_ren*1E-3+shift, marker='o', linewidth=1.5, color=highcontrast['blue'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                                _arr[0][0].plot(self.temp, self.zpr_ren*1E-3+shift_zpr, marker='o', linewidth=2.0, color=highcontrast['red'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                                _arr[0][0].plot(self.temp, self.te_ren*1E-3+shift_te, marker='o', linewidth=2.0, color=highcontrast['yellow'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
+                            _arr[0][0].plot(self.temp, self.gap_ren*1E-3+shift, marker='o', linewidth=2.0, color=highcontrast['blue'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
 
-                            _arr[0][0].plot(self.expdata.xaxis, self.expdata.yaxis, marker='s', linestyle='None',color='black')
-
+                            _arr[0][0].plot(self.expdata.xaxis, self.expdata.yaxis, marker='s', linestyle='None',color='darkslategray', markersize=10)
        
                 else:
+                    # No expdata
                     if self.split_zpr_te:
                         _arr[0][0].plot(self.temp, self.zpr_ren, marker='o', linewidth=1.5, color=highcontrast['red'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
                         _arr[0][0].plot(self.temp, self.te_ren, marker='o', linewidth=1.5, color=highcontrast['yellow'], label=self.labels[ifile], linestyle=self.linestyle[ifile])
@@ -2036,8 +2043,8 @@ class ZPR_plotter(object):
         print('exp: {} eV, ZPR = {} meV'.format(fit_exp[1],(self.zero_gap_value-fit_exp[1])*1E3))
 
         dummy_yexp = fit_exp[0]*self.temp[:imax+3] + fit_exp[1]
-        _arr[0][0].plot(self.temp[:imax+3], dummy_yexp, color='darkslategray', linestyle='dashed')
-        _arr[0][0].text(108, 3.135, r'ZPR$\approx$-53 meV (exp)', fontsize=26, color='darkslategray')
+        #_arr[0][0].plot(self.temp[:imax+3], dummy_yexp, color='darkslategray', linestyle='dashed')
+        #_arr[0][0].text(108, 3.135, r'ZPR$\approx$-53 meV (exp)', fontsize=26, color='darkslategray')
         #_arr[0][0].text(108, 3.1475, r'ZPR$\approx$-54 meV (220-300K)', fontsize=26, color='darkturquoise')
         #_arr[0][0].text(450, 3.1050, r'ZPR$\approx$-53 meV (exp)', fontsize=26, color='darkslategray')
         #_arr[0][0].text(450, 3.135, r'ZPR$\approx$-54 meV (220-300K)', fontsize=26, color='darkturquoise')
@@ -2064,16 +2071,18 @@ class ZPR_plotter(object):
         tdebye = 414
         #self.ylims = _arr[0][0].get_ylim()
         self.set_hrefs(self.ylims, _arr[0][0], tdebye, 'k', style='dotted')
-        _arr[0][0].text(420, 2.65, r'$\theta_D$=414K', color='k', fontsize=26)
+        #_arr[0][0].text(420, 2.65, r'$\theta_D$=414K', color='k', fontsize=26)
         self.set_vrefs(_arr[0][0], self.temp, self.zero_gap_value+0.10393, style='dashed')
 #        _arr[0][0].text(20, 3.245, r'FP-ZPR=-104 meV', fontsize=26)
-        _arr[0][0].text(10, 3.2425, r'FP-ZPR=-104 meV', fontsize=26)
+        #_arr[0][0].text(10, 3.2425, r'FP-ZPR=-104 meV', fontsize=26)
 
 
         self.set_xaxis(_arr[0][0], self.temp)
 ##        self.set_vrefs(_arr[0][0], self.temp, 0.)
         if self.expdata:
-            self.set_yaxis(_arr[0][0], 'Gap energy ({})'.format(self.expdata.yaxis_units))
+#            self.set_yaxis(_arr[0][0], 'Gap energy ({})'.format(self.expdata.yaxis_units))
+            self.set_yaxis(_arr[0][0], r'E$_{\rm{g}}$ (eV)')
+
         else:
             self.set_yaxis(_arr[0][0], 'Gap renormalization ({})'.format(self.gap_units))
         self.set_legend_total_gap(_arr[0][0])
@@ -2090,6 +2099,8 @@ class ZPR_plotter(object):
 
             self.set_main_title(fig2)
                
+        _arr[0][0].text(290, 3.137, r'\textbf{AlAs}', fontsize=36)
+        plt.subplots_adjust(left=0.14)
 
         if self.split:
             self.save_figure_split(fig,fig2)
@@ -8566,7 +8577,9 @@ class ZPR_plotter(object):
 
             lims = (0, 350)
             f.set_xlim(lims)
-            f.set_xlabel('Temperature (K)', fontsize=32)
+#            f.set_xlabel('Temperature (K)', fontsize=32)
+            f.set_xlabel('Température (K)', fontsize=32)
+
             f.xaxis.set_major_formatter(FuncFormatter(self.label_formatter))
             plt.setp(f.get_xticklabels(), fontsize=26, weight='bold')
 #            f.xaxis.set_tick_params(labelsize=16)
@@ -8784,11 +8797,13 @@ class ZPR_plotter(object):
         #f.legend(numpoints=1, loc=3, fontsize=16)
         handles = []
         if self.split_zpr_te:
-            handles.append(Line2D([0],[0], marker='o', color=highcontrast['red'], label=r'EPI'))
-            handles.append(Line2D([0],[0], marker='o', color=highcontrast['yellow'], label=r'TE'))
-        handles.append(Line2D([0],[0], marker='o', color=highcontrast['blue'], label=r'total'))
+            handles.append(Line2D([0],[0], marker='o', color=highcontrast['red'], linewidth=2.0, label=r'EPI'))
+            handles.append(Line2D([0],[0], marker='o', color=highcontrast['yellow'], linewidth=2.0, label=r'TE'))
+        handles.append(Line2D([0],[0], marker='o', color=highcontrast['blue'], linewidth=2.0,label=r'Total'))
         if self.expdata:
-            handles.append(Line2D([0],[0], marker='s', color='k', label=r'exp', linestyle='None', markersize=8))
+#            handles.append(Line2D([0],[0], marker='s', color='k', label=r'exp', linestyle='None', markersize=10))
+            handles.append(Line2D([0],[0], marker='s', color='darkslategray', label=r'Monemar', linestyle='None', markersize=10))
+
 
 
         f.legend(handles = handles, numpoints = 1, loc = 'lower left', bbox_to_anchor=(0.01,0.01), ncol = 1, fontsize=26)
@@ -8824,10 +8839,10 @@ class ZPR_plotter(object):
 
         if self.savefile:
             if self.save_format == 'eps' or self.save_format == 'pdf':
-                g.savefig('figures/{}.{}'.format(self.savefile,self.save_format), format=self.save_format,dpi=1200)
+                g.savefig('figures/{}.{}'.format(self.savefile,self.save_format), format=self.save_format,dpi=1200, bbox_inches="tight")
                 os.system('open figures/{}.{}'.format(self.savefile,self.save_format))
             else:
-                g.savefig('figures/{}.{}'.format(self.savefile,self.save_format))
+                g.savefig('figures/{}.{}'.format(self.savefile,self.save_format), bbox_inches="tight")
                 os.system('open figures/{}.{}'.format(self.savefile,self.save_format))
 
         else:
@@ -8999,6 +9014,7 @@ def plotter(
         cmap_cols = None, # rename this, it is for the PT diagram only
         crossover = False,
         diagram_together = False,
+        q0_factor = None,
         save_format = 'png',
 
         **kwargs):
@@ -9089,6 +9105,7 @@ def plotter(
             modes = modes,
             verbose = verbose,
             valence = valence,
+            q0_factor = q0_factor,
 
             spline = spline,
             spline_factor = spline_factor,
