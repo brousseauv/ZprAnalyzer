@@ -98,6 +98,13 @@ class ZPRfile(CDFfile):
             if status != []:
                 self.kpoints_spline = ncdata.variables['reduced_coordinated_of_kpoints_spline'][:, :]
 
+            status = ncdata.get_variables_by_attributes(name='qpt_contribution_temperature_dependent')
+            if status != []:
+                self.reduced_tdr_qpt = ncdata.variables['qpt_contribution_temperature_dependent'][:,:,:,:,:]
+            status = ncdata.get_variables_by_attributes(name='qpt_contribution_temperature_dependent_modes')
+            if status != []:
+                self.reduced_tdr_qpt_mode = ncdata.variables['qpt_contribution_temperature_dependent_modes'][:,:,:,:,:,:]
+
             # Only for split contribution,  VB and CB / modes separate ###
 
 #            self.fan_g2 = ncdata.variables['reduced_fan_g2'][:, :, :, :, :, :, :] # spin kpt 2 2 mode qpt cplex
